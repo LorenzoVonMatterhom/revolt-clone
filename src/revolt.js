@@ -295,7 +295,7 @@ export async function loadCar(id, name) {
     center: bodyBounds.getCenter(new THREE.Vector3()).add(visual.position),
     wheels: wheels.map((wheel) => {
       const size = new THREE.Box3().setFromObject(wheel).getSize(new THREE.Vector3());
-      return { position: wheel.position.clone().add(visual.position), radius: size.y * 0.5, turnable: wheel.userData.turnable, powered: wheel.userData.powered, steerRatio: wheel.userData.steerRatio, engineRatio: wheel.userData.engineRatio };
+      return { position: wheel.position.clone().add(visual.position), radius: size.y * 0.5, halfWidth: size.x * 0.5, turnable: wheel.userData.turnable, powered: wheel.userData.powered, steerRatio: wheel.userData.steerRatio, engineRatio: wheel.userData.engineRatio };
     }),
   };
   return root;
