@@ -2,8 +2,406 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Re-Volt Three Clone</title>
+    <style>
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #080a0d;
+  color: #f5f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#game {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  min-width: 320px;
+}
+
+#scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #0b1017;
+}
+
+button,
+select {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(14, 18, 24, 0.72);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0 14px;
+  backdrop-filter: blur(14px);
+}
+
+button:hover,
+button:focus-visible,
+select:hover,
+select:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  outline: none;
+}
+
+select {
+  max-width: min(34vw, 210px);
+  padding-right: 28px;
+  background: #171a1f;
+  color: #ffffff;
+  color-scheme: dark;
+}
+
+select option {
+  background: #171a1f;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+select:hover,
+select:focus-visible {
+  background: #292d34;
+  color: #ffffff;
+  outline: 2px solid #f1c94b;
+  outline-offset: 2px;
+}
+
+.hud {
+  position: fixed;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.hud-top {
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand,
+.readouts,
+.help,
+.minimap,
+.hud-left {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 10, 13, 0.58);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(16px);
+}
+
+.brand {
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.brand strong {
+  display: block;
+  font-size: clamp(1rem, 2vw, 1.45rem);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.kicker {
+  color: #9ad0ff;
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(58px, 86px));
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.readouts div {
+  min-height: 58px;
+  padding: 8px 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.readouts div:first-child {
+  border-left: 0;
+}
+
+.readouts span {
+  color: #b5c1d0;
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.readouts strong {
+  display: block;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.hud-left {
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 8px;
+  pointer-events: auto;
+}
+
+.minimap {
+  right: 18px;
+  bottom: 18px;
+  width: 180px;
+  height: 180px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#map {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.help {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 4;
+  display: flex;
+  transform: translateX(-50%);
+  gap: 10px;
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: #d7deea;
+  font-size: 0.78rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.start {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  padding: 28px 4%;
+  pointer-events: none;
+}
+
+.start-panel {
+  width: 320px;
+  max-width: 100%;
+  pointer-events: auto;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.68);
+  border-left: 3px solid #f1c94b;
+}
+
+.start h1 {
+  margin: 8px 0 12px;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.start p {
+  max-width: 52ch;
+  color: #edf4ff;
+  font-size: 14px;
+  line-height: 1.55;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+}
+
+#startBtn {
+  min-width: 150px;
+  margin-top: 10px;
+  background: #f1c94b;
+  border-color: #ffe48a;
+  color: #101010;
+}
+
+.start.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+.start.hidden .start-panel { pointer-events: none; }
+.menu-open .hud, .menu-open .help { visibility: hidden; }
+.powerup-slot { top: 110px; left: 18px; width: 246px; min-height: 74px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.68); border-left: 3px solid #f1c94b; padding: 5px; }
+.powerup-slot button { pointer-events: auto; width: 64px; height: 64px; min-width: 64px; padding: 0; border-radius: 4px; }
+.powerup-slot button:disabled { cursor: default; opacity: 0.6; }
+.powerup-slot canvas { display: block; width: 60px; height: 60px; }
+.powerup-slot strong { font-size: 14px; display: block; }
+.powerup-slot span { display: block; color: #f1c94b; font-size: 12px; min-height: 16px; margin-top: 5px; }
+@media (max-width: 760px) { .powerup-slot { top: 160px; width: min(220px, calc(100% - 154px)); } }
+.powerup-slot > div { min-width: 0; overflow-wrap: anywhere; }
+.debug-panel { top: 110px; right: 18px; width: 240px; padding: 12px; background: #171a1f; border: 1px solid #f1c94b; border-radius: 4px; pointer-events: auto; }
+.debug-panel h2 { margin: 0 0 12px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+.debug-panel h2 span { font-size: 11px; font-weight: 500; color: #f1c94b; }
+.debug-panel label { display: block; font-size: 12px; margin-bottom: 6px; }
+.debug-panel select { width: 100%; max-width: none; font-size: 13px; }
+.debug-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin-top: 8px; }
+.debug-actions button { padding: 0 6px; font-size: 13px; border-radius: 4px; }
+.debug-panel output { display: block; margin-top: 8px; min-height: 18px; font-size: 12px; color: #f1c94b; overflow-wrap: anywhere; }
+@media (max-width:760px) { .debug-panel { top: 276px; width: 220px; padding: 10px; } }
+.start h2 { font-size: 20px; text-transform: uppercase; color: #f1c94b; margin: 24px 0 12px; }
+.start h3 { font-size: 20px; color: #f1c94b; margin: 20px 0 14px; }
+.car-selector { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 5px; }
+.car-selector button { padding: 0; border-radius: 4px; }
+.car-selector select { width: 100%; max-width: none; padding: 0 8px; font-size: 14px; }
+#carStats { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 9px 6px; font-size: 13px; }
+#carStats dt { color: #dadada; }
+#carStats dd { margin: 0; }
+#carStats meter { width: 58px; height: 12px; margin-right: 7px; }
+.track-label { display: block; font-size: 13px; margin: 20px 0 6px; }
+#menuTrack { width: 100%; max-width: none; font-size: 14px; }
+#startDescription:empty { display: none; }
+#startBtn { width: 100%; }
+@media (max-width: 600px) {
+  .start { align-items: flex-end; padding: 12px; }
+  .start-panel { width: 100%; padding: 12px; }
+  .start h1 { font-size: 26px; margin: 0; }
+  .start h2 { font-size: 16px; margin: 8px 0; }
+  .start h3 { display: none; }
+  #carStats { grid-template-columns: 65px minmax(0, 1fr) 65px minmax(0, 1fr); gap: 5px; font-size: 11px; margin: 8px 0; }
+  #carStats meter { display: none; }
+  .track-label { margin: 8px 0 4px; }
+}
+
+@media (max-width: 760px) {
+  .hud-top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .brand strong {
+    white-space: normal;
+  }
+
+  .readouts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .readouts div {
+    min-height: 50px;
+    padding: 7px;
+  }
+
+  .readouts strong {
+    font-size: 1rem;
+  }
+
+  .help {
+    display: none;
+  }
+
+  .minimap {
+    top: 160px;
+    bottom: auto;
+    width: 100px;
+    height: 100px;
+  }
+
+  .hud-left {
+    right: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  select {
+    max-width: 100%;
+  }
+}
+
+.touch-controls { display: none; }
+@media (any-pointer: coarse), (max-width: 1024px) {
+  #scene { touch-action: none; }
+  .touch-controls {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom)); gap: 12px;
+  }
+  .touch-control-group { display: flex; gap: 8px; pointer-events: auto; }
+  .touch-controls button {
+    width: clamp(48px, 11vw, 72px); height: clamp(60px, 14vw, 80px);
+    padding: 0; font-size: 14px; touch-action: none;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    background: rgba(14, 18, 24, 0.8); border: 2px solid rgba(255,255,255,0.45);
+  }
+  .touch-controls button[data-code="KeyW"] { background: rgba(52, 120, 55, 0.85); }
+  .touch-controls button.is-pressed { background: #f1c94b; color: #101010; border-color: #fff; }
+  .hud-top { top: max(8px, env(safe-area-inset-top)); left: 12px; right: 12px; flex-direction: row; }
+  .brand, .help, .debug-panel { display: none; }
+  .readouts { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .readouts div { min-height: 42px; padding: 4px 8px; }
+  .readouts strong { font-size: 1rem; }
+  .hud-left {
+    left: 12px; right: 12px; top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+    bottom: auto; padding: 4px; gap: 6px; justify-content: flex-end; flex-wrap: wrap;
+    background: transparent; border: 0; box-shadow: none; backdrop-filter: none;
+    pointer-events: none;
+  }
+  .hud-left button { pointer-events: auto; padding: 0 10px; min-height: 44px; font-size: 12px; }
+  .hud-left #levelSelect, .hud-left #nextLevelBtn { display: none; }
+  .powerup-slot {
+    top: calc(max(8px, env(safe-area-inset-top)) + 102px);
+    left: 12px; width: min(220px, calc(100% - 130px)); min-height: 64px;
+  }
+  .powerup-slot button { touch-action: manipulation; }
+  .minimap {
+    top: calc(max(8px, env(safe-area-inset-top)) + 102px);
+    right: 12px; bottom: auto; width: 88px; height: 88px;
+  }
+  .start { overflow-y: auto; pointer-events: auto; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .start-panel { margin: auto 0; }
+}
+@media (any-pointer: coarse) and (max-height: 500px), (max-width: 1024px) and (max-height: 500px) {
+  .start { align-items: flex-start; padding-top: 8px; }
+  .start-panel { width: 300px; padding: 10px; }
+  .start h1 { font-size: 24px; margin: 0; }
+  .start h2 { font-size: 16px; margin: 6px 0; }
+  .start h3, #carStats { display: none; }
+  .track-label { margin-top: 8px; }
+  .minimap { width: 64px; height: 64px; }
+}
+
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
+    "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.tsl.js",
+    "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.9.15?external=three",
+    "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.21.0"
+  }
+}
+    </script>
   </head>
   <body>
     <div id="game" class="menu-open">
@@ -65,6 +463,2324 @@
         </div>
       </div>
     </div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="text/plain" data-game-module="assets.js">
+export function gameAssetUrl(path, base = new URL(".", document.baseURI).pathname) {
+  if (/^(?:[a-z]+:)?\/\//i.test(path) || /^(data|blob):/i.test(path)) return path;
+  return `${base.endsWith("/") ? base : `${base}/`}${path.replace(/^\/+/, "")}`;
+}
+
+    </script>
+    <script type="text/plain" data-game-module="car-effects.js">
+import * as THREE from "three";
+
+export function setWheelPose(wheel, steering, rotation) {
+  wheel.rotation.set(0, steering, 0);
+  wheel.userData.tire.rotation.set(rotation, 0, 0);
+}
+
+export class CarResetFade {
+  constructor(mesh) {
+    this.mesh = mesh; this.materials = new Map(); this.active = false;
+    this.opacity = 1; this.elapsed = 0; this.repositioned = false;
+  }
+
+  start(reposition) {
+    if (this.active) return false;
+    this.active = true; this.elapsed = 0; this.repositioned = false; this.reposition = reposition;
+    this.apply(1);
+    return true;
+  }
+
+  apply(opacity) {
+    this.opacity = opacity;
+    this.mesh.traverse((object) => {
+      if (!object.material) return;
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (!this.materials.has(material)) this.materials.set(material, { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite });
+        const original = this.materials.get(material);
+        if (!material.transparent) { material.transparent = true; material.needsUpdate = true; }
+        material.opacity = original.opacity * opacity;
+        material.depthWrite = false;
+      }
+    });
+  }
+
+  update(dt) {
+    if (!this.active) return;
+    this.elapsed += Math.max(0, dt);
+    const fadeOut = 0.25, fadeIn = 0.4;
+    if (this.elapsed < fadeOut) this.apply(1 - this.elapsed / fadeOut);
+    else {
+      if (!this.repositioned) { this.apply(0); this.repositioned = true; this.reposition(); }
+      if (this.elapsed < fadeOut + fadeIn) this.apply((this.elapsed - fadeOut) / fadeIn);
+      else this.cancel();
+    }
+  }
+
+  cancel() {
+    for (const [material, original] of this.materials) {
+      if (material.transparent !== original.transparent) material.needsUpdate = true;
+      material.opacity = original.opacity; material.transparent = original.transparent; material.depthWrite = original.depthWrite;
+    }
+    this.materials.clear(); this.active = false; this.opacity = 1; this.reposition = null;
+  }
+}
+
+export function engineProfile(engineClass) {
+  return engineClass === 1
+    ? { sample: "/wavs/petrol.wav", idleVolume: 0.12, idlePitch: 0.7, revRange: 1.4 }
+    : { sample: "/wavs/electro.wav", idleVolume: 0.025, idlePitch: 0.65, revRange: 1.7 };
+}
+
+export class CarEngineAudio {
+  constructor(listener, mesh, buffer) {
+    this.profile = engineProfile(mesh.userData.engineClass);
+    this.audio = new THREE.PositionalAudio(listener);
+    this.audio.setBuffer(buffer).setLoop(true).setRefDistance(18).setRolloffFactor(1.5).setMaxDistance(160);
+    this.audio.setVolume(0);
+    mesh.add(this.audio);
+    this.revs = 0;
+  }
+
+  update(dt, { running, muted, speed, throttle, airborne }) {
+    if (!running || muted) {
+      if (this.audio.isPlaying) this.audio.stop();
+      return;
+    }
+    if (!this.audio.isPlaying) this.audio.play();
+    const load = Math.abs(throttle);
+    const target = THREE.MathUtils.clamp(Math.abs(speed) / 45 * 0.8 + load * (airborne ? 0.8 : 0.25), 0, 1);
+    this.revs = THREE.MathUtils.lerp(this.revs, target, 1 - Math.exp(-dt * 8));
+    this.audio.setPlaybackRate(this.profile.idlePitch + this.revs * this.profile.revRange);
+    this.audio.setVolume(this.profile.idleVolume + this.revs * 0.22 + load * 0.07);
+  }
+}
+
+    </script>
+    <script type="text/plain" data-game-module="levels.js">
+export const LEVELS = [
+  {
+    id: "nhood1",
+    name: "Neighborhood 1",
+    kind: "race",
+    textures: ["nhood1a.bmp", "nhood1b.bmp", "nhood1c.bmp"],
+    props: ["house1", "house2", "bin", "barrier", "tree1", "ramp"],
+    ambience: "/wavs/hood/cityamb2.wav",
+    palette: { sky: 0x9fc8ef, fog: 0x9fc8ef, tint: 0x84ad65, prop: 0xd4c0a2 },
+    shape: { radiusX: 78, radiusZ: 82, wobble: 0.24, pinch: 0.16, seed: 11 },
+  },
+  {
+    id: "nhood2",
+    name: "Neighborhood 2",
+    kind: "race",
+    textures: ["nhood2a.bmp", "nhood2b.bmp", "nhood2c.bmp"],
+    props: ["house1", "house2", "dogb", "dustbin", "ramp", "tree2"],
+    ambience: "/wavs/hood/birds2.wav",
+    palette: { sky: 0xa7cce8, fog: 0xa7cce8, tint: 0x7aa65d, prop: 0xcab092 },
+    shape: { radiusX: 88, radiusZ: 70, wobble: 0.18, pinch: 0.3, seed: 13 },
+  },
+  {
+    id: "nhood1_battle",
+    name: "Neighborhood Battle",
+    kind: "battle",
+    textures: ["nhood1_battlea.bmp", "nhood1_battleb.bmp", "nhood1_battlec.bmp"],
+    props: ["4x4", "bush1", "fountain1", "plant2", "tree1"],
+    ambience: "/wavs/hood/kids.wav",
+    palette: { sky: 0x98c4f0, fog: 0x98c4f0, tint: 0x86b572, prop: 0xb9a57c },
+    shape: { radiusX: 58, radiusZ: 60, wobble: 0.38, pinch: 0.06, seed: 15 },
+  },
+  {
+    id: "garden1",
+    name: "Botanical Garden",
+    kind: "race",
+    textures: ["garden1a.bmp", "garden1b.bmp", "garden1c.bmp"],
+    props: ["palmtree", "bush1", "bush2", "fountain1", "plant4", "ivy1"],
+    ambience: "/wavs/garden/tropics2.wav",
+    palette: { sky: 0xb8dcf4, fog: 0xb8dcf4, tint: 0x4f9858, prop: 0x4d8b49 },
+    shape: { radiusX: 92, radiusZ: 72, wobble: 0.32, pinch: 0.24, seed: 21 },
+  },
+  {
+    id: "bot_bat",
+    name: "Garden Battle",
+    kind: "battle",
+    textures: ["bot_bata.bmp", "bot_batb.bmp", "bot_batc.bmp"],
+    props: ["palmtree", "bush1", "bush2", "leaf1", "plant3"],
+    ambience: "/wavs/garden/animal1.wav",
+    palette: { sky: 0xb7dff0, fog: 0xb7dff0, tint: 0x579a52, prop: 0x3f743b },
+    shape: { radiusX: 62, radiusZ: 66, wobble: 0.42, pinch: 0.12, seed: 22 },
+  },
+  {
+    id: "market1",
+    name: "Supermarket 1",
+    kind: "race",
+    textures: ["market1a.bmp", "market1b.bmp", "market1c.bmp"],
+    props: ["milk_ff", "milk_nf", "tin_g", "tin_s", "forklift", "poster"],
+    ambience: "/wavs/market/aircond1.wav",
+    palette: { sky: 0x94a7bd, fog: 0x94a7bd, tint: 0x6b7e84, prop: 0xcfd7cf },
+    shape: { radiusX: 76, radiusZ: 92, wobble: 0.14, pinch: 0.34, seed: 31 },
+  },
+  {
+    id: "market2",
+    name: "Supermarket 2",
+    kind: "race",
+    textures: ["market2a.bmp", "market2b.bmp", "market2c.bmp"],
+    props: ["closed_n", "open_p", "kidride", "tray", "tin_g", "fabric"],
+    ambience: "/wavs/market/freezer1.wav",
+    palette: { sky: 0x8da3bd, fog: 0x8da3bd, tint: 0x657b82, prop: 0xd6d0ba },
+    shape: { radiusX: 84, radiusZ: 76, wobble: 0.22, pinch: 0.22, seed: 33 },
+  },
+  {
+    id: "markar",
+    name: "Market Arena",
+    kind: "battle",
+    textures: ["markara.bmp", "markarb.bmp", "markarc.bmp"],
+    props: ["fabric01", "fabric02", "milkrownf", "tin_g", "tin_s"],
+    ambience: "/wavs/market/cabnhum2.wav",
+    palette: { sky: 0x90a8bf, fog: 0x90a8bf, tint: 0x6f7d78, prop: 0xb8a571 },
+    shape: { radiusX: 60, radiusZ: 54, wobble: 0.5, pinch: 0.04, seed: 35 },
+  },
+  {
+    id: "muse1",
+    name: "Museum 1",
+    kind: "race",
+    textures: ["muse1a.bmp", "muse1b.bmp", "muse1c.bmp"],
+    props: ["allos", "amon", "armour", "bench", "mummy", "rail"],
+    ambience: "/wavs/muse/museumam.wav",
+    palette: { sky: 0x737b8a, fog: 0x737b8a, tint: 0x766f63, prop: 0xb4a58c },
+    shape: { radiusX: 82, radiusZ: 88, wobble: 0.2, pinch: 0.28, seed: 41 },
+  },
+  {
+    id: "muse2",
+    name: "Museum 2",
+    kind: "race",
+    textures: ["muse2a.bmp", "muse2b.bmp", "muse2c.bmp"],
+    props: ["tricer", "skull", "saturn", "scarab", "case", "glass"],
+    ambience: "/wavs/muse/laserhum.wav",
+    palette: { sky: 0x697688, fog: 0x697688, tint: 0x675e58, prop: 0xc1b494 },
+    shape: { radiusX: 92, radiusZ: 66, wobble: 0.26, pinch: 0.18, seed: 43 },
+  },
+  {
+    id: "muse_bat",
+    name: "Museum Battle",
+    kind: "battle",
+    textures: ["muse_bata.bmp", "muse_batb.bmp", "muse_batc.bmp"],
+    props: ["case", "glass", "post", "pot", "rail"],
+    ambience: "/wavs/muse/alarm2.wav",
+    palette: { sky: 0x6c7480, fog: 0x6c7480, tint: 0x665f5f, prop: 0xb7aa8a },
+    shape: { radiusX: 56, radiusZ: 64, wobble: 0.45, pinch: 0.1, seed: 45 },
+  },
+  {
+    id: "ship1",
+    name: "Toytanic 1",
+    kind: "race",
+    textures: ["ship1a.bmp", "ship1b.bmp", "ship1c.bmp"],
+    props: ["bollard", "deckseat", "davit", "lifeboat", "lifebelt", "vent"],
+    ambience: "/wavs/ship/seagulls.wav",
+    palette: { sky: 0x9cc9ed, fog: 0x9cc9ed, tint: 0x526978, prop: 0xdad4c6 },
+    shape: { radiusX: 104, radiusZ: 58, wobble: 0.16, pinch: 0.36, seed: 51 },
+  },
+  {
+    id: "ship2",
+    name: "Toytanic 2",
+    kind: "race",
+    textures: ["ship2a.bmp", "ship2b.bmp", "ship2c.bmp"],
+    props: ["csring", "deckramp", "panel1", "startrope", "strut", "vent"],
+    ambience: "/wavs/ship/shiphorn.wav",
+    palette: { sky: 0x95c5ed, fog: 0x95c5ed, tint: 0x4f6578, prop: 0xd5cfbd },
+    shape: { radiusX: 98, radiusZ: 70, wobble: 0.22, pinch: 0.26, seed: 53 },
+  },
+  {
+    id: "toy2",
+    name: "Toy World 2",
+    kind: "race",
+    textures: ["toy2a.bmp", "toy2b.bmp", "toy2c.bmp"],
+    props: ["book", "bot_box", "cabinet", "dragon", "robot", "teddy"],
+    ambience: "/wavs/toy/arcade.wav",
+    palette: { sky: 0xaed6ff, fog: 0xaed6ff, tint: 0xb89755, prop: 0xf2c95d },
+    shape: { radiusX: 88, radiusZ: 88, wobble: 0.36, pinch: 0.16, seed: 61 },
+  },
+  {
+    id: "toylite",
+    name: "Toy World Lite",
+    kind: "race",
+    textures: ["toylitea.bmp", "toyliteb.bmp", "toylitec.bmp"],
+    props: ["ball", "bigrocket", "crane", "dozer", "gator", "rocketpad"],
+    ambience: "/wavs/toy/train.wav",
+    palette: { sky: 0xb8ddff, fog: 0xb8ddff, tint: 0xb58c52, prop: 0xefc65a },
+    shape: { radiusX: 76, radiusZ: 96, wobble: 0.3, pinch: 0.2, seed: 63 },
+  },
+  {
+    id: "wild_west1",
+    name: "Wild West 1",
+    kind: "race",
+    textures: ["wild_west1a.bmp", "wild_west1b.bmp", "wild_west1c.bmp"],
+    props: ["bale", "barrel", "box1", "danger_sign", "plank1", "support"],
+    ambience: "/wavs/ghost/townbell.wav",
+    palette: { sky: 0xf0c587, fog: 0xf0c587, tint: 0x9a7d4c, prop: 0xb47a42 },
+    shape: { radiusX: 98, radiusZ: 76, wobble: 0.28, pinch: 0.3, seed: 71 },
+  },
+  {
+    id: "wild_west2",
+    name: "Wild West 2",
+    kind: "race",
+    textures: ["wild_west2a.bmp", "wild_west2b.bmp", "wild_west2c.bmp"],
+    props: ["beam", "bench", "boulder1", "chest", "mine_ramp", "sign2"],
+    ambience: "/wavs/ghost/coyote1.wav",
+    palette: { sky: 0xeabb7b, fog: 0xeabb7b, tint: 0x927146, prop: 0xaf7340 },
+    shape: { radiusX: 86, radiusZ: 94, wobble: 0.34, pinch: 0.18, seed: 73 },
+  },
+  {
+    id: "stunts",
+    name: "Stunt Arena",
+    kind: "race",
+    textures: ["stuntsa.bmp", "stuntsb.bmp", "stuntsc.bmp"],
+    props: ["ramp", "loop", "halfpipe", "barrier", "tower"],
+    ambience: "/wavs/countdown.wav",
+    palette: { sky: 0xa9d2fa, fog: 0xa9d2fa, tint: 0x6c7b86, prop: 0xebd23e },
+    shape: { radiusX: 112, radiusZ: 66, wobble: 0.4, pinch: 0.12, seed: 81 },
+  },
+];
+
+export const FRONTEND = { id: "frontend", kind: "menu" };
+
+    </script>
+    <script type="text/plain" data-game-module="main.js">
+const __REVOLT_FILES__ = ["/levels/bot_bat/bot_bata.bmp","/levels/bot_bat/bot_batb.bmp","/levels/bot_bat/bot_batc.bmp","/levels/bot_bat/bot_batd.bmp","/levels/bot_bat/bot_bate.bmp","/levels/bot_bat/bot_batf.bmp","/levels/bot_bat/bot_batg.bmp","/levels/bot_bat/bot_bath.bmp","/levels/bot_bat/bot_bati.bmp","/levels/bot_bat/bot_batj.bmp","/levels/bot_bat/bush1.prm","/levels/bot_bat/bush2.prm","/levels/bot_bat/leaf1.prm","/levels/bot_bat/palmtree.prm","/levels/bot_bat/plant2.prm","/levels/bot_bat/plant3.prm","/levels/bot_bat/plant4.prm","/levels/bot_bat/tree1.prm","/levels/frontend/bballbox.prm","/levels/frontend/box01.prm","/levels/frontend/box02.prm","/levels/frontend/box03.prm","/levels/frontend/box04.prm","/levels/frontend/box05.prm","/levels/frontend/box5.prm","/levels/frontend/chicks.prm","/levels/frontend/clockcase.prm","/levels/frontend/cup01.prm","/levels/frontend/frontend.pan","/levels/frontend/frontenda.bmp","/levels/frontend/frontendb.bmp","/levels/frontend/frontendc.bmp","/levels/frontend/frontendd.bmp","/levels/frontend/frontende.bmp","/levels/frontend/frontendf.bmp","/levels/frontend/frontendg.bmp","/levels/frontend/helbladebig.prm","/levels/frontend/helbladesmall.prm","/levels/frontend/hellbody.prm","/levels/frontend/hellsb.prm","/levels/frontend/largemagstand.prm","/levels/frontend/light.prm","/levels/frontend/magstand.prm","/levels/frontend/pangacard.prm","/levels/frontend/plain.prm","/levels/frontend/podium.prm","/levels/frontend/posterstand.prm","/levels/frontend/posterstand2.prm","/levels/frontend/salebin.prm","/levels/frontend/smallscreen.prm","/levels/frontend/track.prm","/levels/frontend/tvstand.prm","/levels/frontend/ufostand.prm","/levels/garden1/4x4.prm","/levels/garden1/bush1.prm","/levels/garden1/bush2.prm","/levels/garden1/fountain1.prm","/levels/garden1/garden1.pan","/levels/garden1/garden1a.bmp","/levels/garden1/garden1b.bmp","/levels/garden1/garden1c.bmp","/levels/garden1/garden1d.bmp","/levels/garden1/garden1e.bmp","/levels/garden1/garden1f.bmp","/levels/garden1/garden1g.bmp","/levels/garden1/garden1h.bmp","/levels/garden1/garden1i.bmp","/levels/garden1/garden1j.bmp","/levels/garden1/ivy1.prm","/levels/garden1/ivy2.prm","/levels/garden1/ivy3.prm","/levels/garden1/leaf1.prm","/levels/garden1/palmtree.prm","/levels/garden1/plant2.prm","/levels/garden1/plant3.prm","/levels/garden1/plant4.prm","/levels/garden1/reversed/garden1.pan","/levels/garden1/screen.prm","/levels/garden1/tree1.prm","/levels/markar/fabric01.prm","/levels/markar/fabric02.prm","/levels/markar/markara.bmp","/levels/markar/markarb.bmp","/levels/markar/markarc.bmp","/levels/markar/markard.bmp","/levels/markar/markare.bmp","/levels/markar/markarf.bmp","/levels/markar/markarg.bmp","/levels/markar/markarh.bmp","/levels/markar/markari.bmp","/levels/markar/milk_ff.prm","/levels/markar/milk_nf.prm","/levels/markar/milkrowff.prm","/levels/markar/milkrownf.prm","/levels/markar/tin_g.prm","/levels/markar/tin_s.prm","/levels/market1/cheese.prm","/levels/market1/chicken.prm","/levels/market1/closed_n.prm","/levels/market1/closed_p.prm","/levels/market1/fabric.prm","/levels/market1/fabric_01.prm","/levels/market1/flouro.prm","/levels/market1/flourooff.prm","/levels/market1/forklift.prm","/levels/market1/kidride.prm","/levels/market1/lflouro.prm","/levels/market1/market1.pan","/levels/market1/market1a.bmp","/levels/market1/market1b.bmp","/levels/market1/market1c.bmp","/levels/market1/market1d.bmp","/levels/market1/market1e.bmp","/levels/market1/market1f.bmp","/levels/market1/market1g.bmp","/levels/market1/market1h.bmp","/levels/market1/market1i.bmp","/levels/market1/market1j.bmp","/levels/market1/milk_ff.prm","/levels/market1/milk_nf.prm","/levels/market1/milk_row_ff.prm","/levels/market1/milk_row_nf.prm","/levels/market1/open_n.prm","/levels/market1/open_p.prm","/levels/market1/outside.prm","/levels/market1/post.prm","/levels/market1/poster.prm","/levels/market1/reversed/market1.pan","/levels/market1/tin_g.prm","/levels/market1/tin_s.prm","/levels/market1/tins_g_row.prm","/levels/market1/tins_s_row.prm","/levels/market1/tray.prm","/levels/market1/trolley.bmp","/levels/market2/cheese.prm","/levels/market2/chicken.prm","/levels/market2/closed_n.prm","/levels/market2/closed_p.prm","/levels/market2/fabric.prm","/levels/market2/fabric02.prm","/levels/market2/flouro.prm","/levels/market2/flourooff.prm","/levels/market2/forklift.prm","/levels/market2/kidride.prm","/levels/market2/lflouro.prm","/levels/market2/market2.pan","/levels/market2/market2a.bmp","/levels/market2/market2b.bmp","/levels/market2/market2c.bmp","/levels/market2/market2d.bmp","/levels/market2/market2e.bmp","/levels/market2/market2f.bmp","/levels/market2/market2g.bmp","/levels/market2/market2h.bmp","/levels/market2/market2i.bmp","/levels/market2/market2j.bmp","/levels/market2/market2k.bmp","/levels/market2/milk_ff.prm","/levels/market2/milk_nf.prm","/levels/market2/milk_row_ff.prm","/levels/market2/milk_row_nf.prm","/levels/market2/milkrowff.prm","/levels/market2/milkrownf.prm","/levels/market2/open_n.prm","/levels/market2/open_p.prm","/levels/market2/outside.prm","/levels/market2/post.prm","/levels/market2/poster.prm","/levels/market2/reversed/market2.pan","/levels/market2/tin_g.prm","/levels/market2/tin_s.prm","/levels/market2/tins_g_row.prm","/levels/market2/tins_s_row.prm","/levels/market2/tray.prm","/levels/muse1/4x4.prm","/levels/muse1/allos.prm","/levels/muse1/amon.prm","/levels/muse1/armour.prm","/levels/muse1/bench.prm","/levels/muse1/bin.prm","/levels/muse1/cabine.prm","/levels/muse1/claw.prm","/levels/muse1/dog.prm","/levels/muse1/egypi1.prm","/levels/muse1/egypi2.prm","/levels/muse1/egypi3.prm","/levels/muse1/firext.prm","/levels/muse1/fish.prm","/levels/muse1/glas01.prm","/levels/muse1/glas02.prm","/levels/muse1/glas03.prm","/levels/muse1/glas04.prm","/levels/muse1/glas05.prm","/levels/muse1/glasfish.prm","/levels/muse1/glasl.prm","/levels/muse1/glasr.prm","/levels/muse1/glassl.prm","/levels/muse1/handle.prm","/levels/muse1/helmet.prm","/levels/muse1/holder.prm","/levels/muse1/holder2.prm","/levels/muse1/invisbox.prm","/levels/muse1/kickplate.prm","/levels/muse1/mop.prm","/levels/muse1/mummy.prm","/levels/muse1/muse1.pan","/levels/muse1/muse1a.bmp","/levels/muse1/muse1b.bmp","/levels/muse1/muse1c.bmp","/levels/muse1/muse1d.bmp","/levels/muse1/muse1e.bmp","/levels/muse1/muse1f.bmp","/levels/muse1/museramp.prm","/levels/muse1/pot.prm","/levels/muse1/rail.prm","/levels/muse1/rail2.prm","/levels/muse1/rail3.prm","/levels/muse1/reversed/muse1.pan","/levels/muse1/rope.prm","/levels/muse1/scarab.prm","/levels/muse1/screen.prm","/levels/muse1/shield.prm","/levels/muse1/sign1.prm","/levels/muse1/sign2.prm","/levels/muse1/sign3.prm","/levels/muse1/sign4.prm","/levels/muse1/signgo.prm","/levels/muse1/skull.prm","/levels/muse1/stand.prm","/levels/muse1/strut.prm","/levels/muse1/sword.prm","/levels/muse1/tricer.prm","/levels/muse1/trilo.prm","/levels/muse2/allos.prm","/levels/muse2/amon.prm","/levels/muse2/armour.prm","/levels/muse2/bench.prm","/levels/muse2/bin.prm","/levels/muse2/cabine.prm","/levels/muse2/case.prm","/levels/muse2/dog.prm","/levels/muse2/eagle.prm","/levels/muse2/eagleb.prm","/levels/muse2/firext.prm","/levels/muse2/fish.prm","/levels/muse2/fishglass.prm","/levels/muse2/glass.prm","/levels/muse2/handle.prm","/levels/muse2/helmet.prm","/levels/muse2/holder.prm","/levels/muse2/holder2.prm","/levels/muse2/kickplate.prm","/levels/muse2/mop.prm","/levels/muse2/mummy.prm","/levels/muse2/muse2.pan","/levels/muse2/muse2a.bmp","/levels/muse2/muse2b.bmp","/levels/muse2/muse2c.bmp","/levels/muse2/muse2d.bmp","/levels/muse2/muse2e.bmp","/levels/muse2/muse2f.bmp","/levels/muse2/muse2g.bmp","/levels/muse2/muse2h.bmp","/levels/muse2/muse2i.bmp","/levels/muse2/museramp.prm","/levels/muse2/post.prm","/levels/muse2/pot.prm","/levels/muse2/rail2.prm","/levels/muse2/rail3.prm","/levels/muse2/reversed/muse2.pan","/levels/muse2/rope.prm","/levels/muse2/saturn.prm","/levels/muse2/saturnb.prm","/levels/muse2/saturnc.prm","/levels/muse2/scarab.prm","/levels/muse2/screen.prm","/levels/muse2/shield.prm","/levels/muse2/sign2.prm","/levels/muse2/sign3.prm","/levels/muse2/sign4.prm","/levels/muse2/signa.prm","/levels/muse2/signb.prm","/levels/muse2/signgo.prm","/levels/muse2/skull.prm","/levels/muse2/stand.prm","/levels/muse2/sun.bmp","/levels/muse2/sword.prm","/levels/muse2/tricer.prm","/levels/muse2/trilo.prm","/levels/muse_bat/muse_bata.bmp","/levels/muse_bat/muse_batb.bmp","/levels/muse_bat/muse_batc.bmp","/levels/muse_bat/muse_batd.bmp","/levels/muse_bat/muse_bate.bmp","/levels/muse_bat/muse_batf.bmp","/levels/muse_bat/muse_batg.bmp","/levels/muse_bat/muse_bath.bmp","/levels/muse_bat/muse_bati.bmp","/levels/nhood1/barrier.prm","/levels/nhood1/barrierpole.prm","/levels/nhood1/bin.prm","/levels/nhood1/bmw.prm","/levels/nhood1/bmw2.prm","/levels/nhood1/bmw_w.prm","/levels/nhood1/carbase.prm","/levels/nhood1/hoop.prm","/levels/nhood1/house1.prm","/levels/nhood1/house2.prm","/levels/nhood1/lampost.prm","/levels/nhood1/nhood1.pan","/levels/nhood1/nhood1a.bmp","/levels/nhood1/nhood1b.bmp","/levels/nhood1/nhood1c.bmp","/levels/nhood1/nhood1d.bmp","/levels/nhood1/nhood1e.bmp","/levels/nhood1/nhood1f.bmp","/levels/nhood1/nhood1g.bmp","/levels/nhood1/nhood1h.bmp","/levels/nhood1/nhood1i.bmp","/levels/nhood1/nhood1j.bmp","/levels/nhood1/ramp.prm","/levels/nhood1/ramp1.prm","/levels/nhood1/ramp3.prm","/levels/nhood1/reversed/nhood1.pan","/levels/nhood1/seat1.prm","/levels/nhood1/seat2.prm","/levels/nhood1/skate.prm","/levels/nhood1/sky_bk.bmp","/levels/nhood1/sky_bt.bmp","/levels/nhood1/sky_ft.bmp","/levels/nhood1/sky_lt.bmp","/levels/nhood1/sky_rt.bmp","/levels/nhood1/sky_tp.bmp","/levels/nhood1/start.prm","/levels/nhood1/startrev.prm","/levels/nhood1/steer.prm","/levels/nhood1/tree1.prm","/levels/nhood1/tree1_w.prm","/levels/nhood1/tree2.prm","/levels/nhood1/treetest1.prm","/levels/nhood1/whitepost.prm","/levels/nhood1_battle/4x4.prm","/levels/nhood1_battle/bush1.prm","/levels/nhood1_battle/bush2.prm","/levels/nhood1_battle/fountain1.prm","/levels/nhood1_battle/ivy1.prm","/levels/nhood1_battle/ivy2.prm","/levels/nhood1_battle/ivy3.prm","/levels/nhood1_battle/leaf1.prm","/levels/nhood1_battle/nhood1_battle.pan","/levels/nhood1_battle/nhood1_battlea.bmp","/levels/nhood1_battle/nhood1_battleb.bmp","/levels/nhood1_battle/nhood1_battlec.bmp","/levels/nhood1_battle/nhood1_battled.bmp","/levels/nhood1_battle/nhood1_battlee.bmp","/levels/nhood1_battle/nhood1_battlef.bmp","/levels/nhood1_battle/nhood1_battleg.bmp","/levels/nhood1_battle/nhood1_battleh.bmp","/levels/nhood1_battle/nhood1_battlei.bmp","/levels/nhood1_battle/nhood1_battlej.bmp","/levels/nhood1_battle/palmtree.prm","/levels/nhood1_battle/plant2.prm","/levels/nhood1_battle/plant3.prm","/levels/nhood1_battle/plant4.prm","/levels/nhood1_battle/screen.prm","/levels/nhood1_battle/tree1.prm","/levels/nhood1_battle/tree1_w.prm","/levels/nhood1_battle/tree2.prm","/levels/nhood2/bin.prm","/levels/nhood2/bmw.prm","/levels/nhood2/bmw2.prm","/levels/nhood2/bmw_w.prm","/levels/nhood2/dogb.prm","/levels/nhood2/dustbin.prm","/levels/nhood2/hoop.prm","/levels/nhood2/house1.prm","/levels/nhood2/house2.prm","/levels/nhood2/lampost.prm","/levels/nhood2/nhood2.pan","/levels/nhood2/nhood2a.bmp","/levels/nhood2/nhood2b.bmp","/levels/nhood2/nhood2c.bmp","/levels/nhood2/nhood2d.bmp","/levels/nhood2/nhood2e.bmp","/levels/nhood2/nhood2f.bmp","/levels/nhood2/nhood2g.bmp","/levels/nhood2/nhood2h.bmp","/levels/nhood2/nhood2i.bmp","/levels/nhood2/nhood2j.bmp","/levels/nhood2/pants.prm","/levels/nhood2/ramp3.prm","/levels/nhood2/reed1.prm","/levels/nhood2/reed2.prm","/levels/nhood2/reed3.prm","/levels/nhood2/reversed/nhood2.pan","/levels/nhood2/sflower.prm","/levels/nhood2/sflower2.prm","/levels/nhood2/sflower3.prm","/levels/nhood2/skate.prm","/levels/nhood2/start.prm","/levels/nhood2/stool.prm","/levels/nhood2/table.prm","/levels/nhood2/tree1.prm","/levels/nhood2/tree2.prm","/levels/nhood2/treetest1.prm","/levels/nhood2/water.bmp","/levels/ship1/beltstart.prm","/levels/ship1/bollard.prm","/levels/ship1/csring.prm","/levels/ship1/davit.prm","/levels/ship1/davit2.prm","/levels/ship1/deckramp.prm","/levels/ship1/deckseat.prm","/levels/ship1/deckseat2.prm","/levels/ship1/lifebelt.prm","/levels/ship1/lifebeltstart.prm","/levels/ship1/lifeboat.prm","/levels/ship1/panel1.prm","/levels/ship1/reversed/ship1.pan","/levels/ship1/shadow1.prm","/levels/ship1/shadow2.prm","/levels/ship1/shadow3.prm","/levels/ship1/shadow4.prm","/levels/ship1/shadow5.prm","/levels/ship1/ship1.pan","/levels/ship1/ship1a.bmp","/levels/ship1/ship1b.bmp","/levels/ship1/ship1c.bmp","/levels/ship1/ship1d.bmp","/levels/ship1/ship1e.bmp","/levels/ship1/ship1f.bmp","/levels/ship1/ship1g.bmp","/levels/ship1/ship1h.bmp","/levels/ship1/ship1i.bmp","/levels/ship1/ship1j.bmp","/levels/ship1/sky_bk.bmp","/levels/ship1/sky_bt.bmp","/levels/ship1/sky_ft.bmp","/levels/ship1/sky_lt.bmp","/levels/ship1/sky_rt.bmp","/levels/ship1/sky_tp.bmp","/levels/ship1/startrope.prm","/levels/ship1/strut.prm","/levels/ship1/vent.prm","/levels/ship1/water.bmp","/levels/ship2/beltstart.prm","/levels/ship2/bollard.prm","/levels/ship2/csring.prm","/levels/ship2/davit.prm","/levels/ship2/davit2.prm","/levels/ship2/deckramp.prm","/levels/ship2/deckseat.prm","/levels/ship2/deckseat2.prm","/levels/ship2/lifebelt.prm","/levels/ship2/lifebeltstart.prm","/levels/ship2/lifeboat.prm","/levels/ship2/panel1.prm","/levels/ship2/reversed/ship2.pan","/levels/ship2/shadow1.prm","/levels/ship2/shadow2.prm","/levels/ship2/shadow3.prm","/levels/ship2/shadow4.prm","/levels/ship2/shadow5.prm","/levels/ship2/ship2.pan","/levels/ship2/ship2a.bmp","/levels/ship2/ship2b.bmp","/levels/ship2/ship2c.bmp","/levels/ship2/ship2d.bmp","/levels/ship2/ship2e.bmp","/levels/ship2/ship2f.bmp","/levels/ship2/ship2g.bmp","/levels/ship2/ship2h.bmp","/levels/ship2/ship2i.bmp","/levels/ship2/ship2j.bmp","/levels/ship2/sky_bk.bmp","/levels/ship2/sky_bt.bmp","/levels/ship2/sky_ft.bmp","/levels/ship2/sky_lt.bmp","/levels/ship2/sky_rt.bmp","/levels/ship2/sky_tp.bmp","/levels/ship2/startrope.prm","/levels/ship2/strut.prm","/levels/ship2/vent.prm","/levels/stunts/stunts.pan","/levels/stunts/stuntsa.bmp","/levels/stunts/stuntsb.bmp","/levels/stunts/stuntsc.bmp","/levels/stunts/stuntsd.bmp","/levels/stunts/stuntse.bmp","/levels/stunts/stuntsf.bmp","/levels/stunts/stuntsg.bmp","/levels/stunts/stuntsh.bmp","/levels/stunts/stuntsi.bmp","/levels/stunts/stuntsj.bmp","/levels/toy2/book.prm","/levels/toy2/bot_box.prm","/levels/toy2/bspotgl.prm","/levels/toy2/cabinet.prm","/levels/toy2/carboxa.prm","/levels/toy2/carboxb.prm","/levels/toy2/carboxc.prm","/levels/toy2/carboxd.prm","/levels/toy2/cardbox.prm","/levels/toy2/chest.prm","/levels/toy2/crane.prm","/levels/toy2/dozer.prm","/levels/toy2/dragon.bmp","/levels/toy2/drawer.prm","/levels/toy2/duplo.prm","/levels/toy2/float.prm","/levels/toy2/gator.prm","/levels/toy2/genbox.prm","/levels/toy2/genboxb.prm","/levels/toy2/genboxc.prm","/levels/toy2/genboxd.prm","/levels/toy2/hidepoly.prm","/levels/toy2/hopper.prm","/levels/toy2/nelly.prm","/levels/toy2/palm.prm","/levels/toy2/picket.prm","/levels/toy2/reversed/toy2.pan","/levels/toy2/robot.prm","/levels/toy2/rocket2.prm","/levels/toy2/rocketpad.prm","/levels/toy2/shelf.prm","/levels/toy2/spire.prm","/levels/toy2/spotgl.prm","/levels/toy2/tallbox.prm","/levels/toy2/tanker.prm","/levels/toy2/teddy.prm","/levels/toy2/toy2.pan","/levels/toy2/toy2a.bmp","/levels/toy2/toy2b.bmp","/levels/toy2/toy2c.bmp","/levels/toy2/toy2d.bmp","/levels/toy2/toy2e.bmp","/levels/toy2/toy2f.bmp","/levels/toy2/toy2g.bmp","/levels/toy2/toy2h.bmp","/levels/toy2/toy2i.bmp","/levels/toylite/ball.prm","/levels/toylite/bigroc.prm","/levels/toylite/bigrocket.prm","/levels/toylite/book.prm","/levels/toylite/bot_box.prm","/levels/toylite/bspotgl.prm","/levels/toylite/cabine.prm","/levels/toylite/cabinet.prm","/levels/toylite/carboxa.prm","/levels/toylite/carboxb.prm","/levels/toylite/carboxc.prm","/levels/toylite/carboxd.prm","/levels/toylite/cardbox.prm","/levels/toylite/chest.prm","/levels/toylite/crane.prm","/levels/toylite/dozer.prm","/levels/toylite/drawer.prm","/levels/toylite/duplo.prm","/levels/toylite/float.prm","/levels/toylite/gator.prm","/levels/toylite/genbox.prm","/levels/toylite/genboxb.prm","/levels/toylite/genboxc.prm","/levels/toylite/genboxd.prm","/levels/toylite/hidepoly.prm","/levels/toylite/hopper.prm","/levels/toylite/mrfuzz.prm","/levels/toylite/nelly.prm","/levels/toylite/palm.prm","/levels/toylite/picket.prm","/levels/toylite/reversed/toylite.pan","/levels/toylite/robot.prm","/levels/toylite/rocketpad.prm","/levels/toylite/shelf.prm","/levels/toylite/spire.prm","/levels/toylite/spotgl.prm","/levels/toylite/tallbox.prm","/levels/toylite/teddy.prm","/levels/toylite/toylite.pan","/levels/toylite/toylitea.bmp","/levels/toylite/toyliteb.bmp","/levels/toylite/toylitec.bmp","/levels/toylite/toylited.bmp","/levels/toylite/toylitee.bmp","/levels/toylite/toylitef.bmp","/levels/toylite/toyliteg.bmp","/levels/toylite/truck.prm","/levels/toylite/walker.prm","/levels/toylite/water.bmp","/levels/wild_west1/arrow.prm","/levels/wild_west1/bale.prm","/levels/wild_west1/barrel.prm","/levels/wild_west1/box1.prm","/levels/wild_west1/box2.prm","/levels/wild_west1/chair.prm","/levels/wild_west1/chair2.prm","/levels/wild_west1/chest.prm","/levels/wild_west1/coffin.prm","/levels/wild_west1/flag.prm","/levels/wild_west1/hsign1.prm","/levels/wild_west1/hsign2.prm","/levels/wild_west1/hsign3.prm","/levels/wild_west1/pennant.prm","/levels/wild_west1/pennant2.prm","/levels/wild_west1/plank1.prm","/levels/wild_west1/plank2.prm","/levels/wild_west1/post.prm","/levels/wild_west1/poster1.prm","/levels/wild_west1/poster2.prm","/levels/wild_west1/reversed/wild_west1.pan","/levels/wild_west1/rocking_chair2.prm","/levels/wild_west1/sign1.prm","/levels/wild_west1/sign2.prm","/levels/wild_west1/sign3.prm","/levels/wild_west1/sign4.prm","/levels/wild_west1/sign5.prm","/levels/wild_west1/sign8.prm","/levels/wild_west1/sign9.prm","/levels/wild_west1/table.prm","/levels/wild_west1/wild_west1.pan","/levels/wild_west1/wild_west1a.bmp","/levels/wild_west1/wild_west1b.bmp","/levels/wild_west1/wild_west1c.bmp","/levels/wild_west1/wild_west1d.bmp","/levels/wild_west1/wild_west1e.bmp","/levels/wild_west1/wild_west1f.bmp","/levels/wild_west1/wild_west1g.bmp","/levels/wild_west1/wild_west1h.bmp","/levels/wild_west1/wild_west1i.bmp","/levels/wild_west1/wild_west1j.bmp","/levels/wild_west2/bale.prm","/levels/wild_west2/barrel.prm","/levels/wild_west2/beam.prm","/levels/wild_west2/bench.prm","/levels/wild_west2/bottle.prm","/levels/wild_west2/boulder1.prm","/levels/wild_west2/boulder2.prm","/levels/wild_west2/box1.prm","/levels/wild_west2/box2.prm","/levels/wild_west2/box3.prm","/levels/wild_west2/box4.prm","/levels/wild_west2/box5.prm","/levels/wild_west2/chest.prm","/levels/wild_west2/danger_sign.prm","/levels/wild_west2/flag.prm","/levels/wild_west2/hsign1.prm","/levels/wild_west2/hsign2.prm","/levels/wild_west2/hsign3.prm","/levels/wild_west2/mine_ramp.prm","/levels/wild_west2/pennant.prm","/levels/wild_west2/pennant2.prm","/levels/wild_west2/pick_axe.prm","/levels/wild_west2/plank1.prm","/levels/wild_west2/plank2.prm","/levels/wild_west2/post.prm","/levels/wild_west2/poster1.prm","/levels/wild_west2/poster2.prm","/levels/wild_west2/rail1.prm","/levels/wild_west2/rail2.prm","/levels/wild_west2/reversed/wild_west2.pan","/levels/wild_west2/rocking_chair2.prm","/levels/wild_west2/sign2.prm","/levels/wild_west2/sign3.prm","/levels/wild_west2/sign5.prm","/levels/wild_west2/sign7.prm","/levels/wild_west2/sign8.prm","/levels/wild_west2/sign9.prm","/levels/wild_west2/sleeper.prm","/levels/wild_west2/stool.prm","/levels/wild_west2/support.prm","/levels/wild_west2/support2.prm","/levels/wild_west2/support3.prm","/levels/wild_west2/wild_west2.pan","/levels/wild_west2/wild_west2a.bmp","/levels/wild_west2/wild_west2b.bmp","/levels/wild_west2/wild_west2c.bmp","/levels/wild_west2/wild_west2d.bmp","/levels/wild_west2/wild_west2e.bmp","/levels/wild_west2/wild_west2f.bmp","/levels/wild_west2/wild_west2g.bmp","/levels/wild_west2/wild_west2h.bmp","/levels/wild_west2/wild_west2i.bmp","/levels/wild_west2/wild_west2j.bmp"];
+import { createTouchControls } from "./touch-controls.js";
+import { gameAssetUrl } from "./assets.js";
+import * as THREE from "three";
+import { LEVELS } from "./levels.js";
+import { loadLevel, loadCar, disposeLevel, RV_SCALE } from "./revolt.js";
+import { initializePhysics, MeshPhysics, keyboardSteering } from "./physics.js";
+import { CarEngineAudio, engineProfile, setWheelPose, CarResetFade } from "./car-effects.js";
+import { Showroom } from "./showroom.js";
+import { PowerupSystem, POWERUPS } from "./powerups.js";
+import { RaceAI, makeRaceRoute, makeAiRoute, findAiRecovery } from "./race-ai.js";
+import { SkidMarks, isSkidding } from "./skid-marks.js";
+
+const canvas = document.querySelector("#scene");
+const mapCanvas = document.querySelector("#map");
+const mapCtx = mapCanvas.getContext("2d");
+const startOverlay = document.querySelector("#start");
+const startBtn = document.querySelector("#startBtn");
+const levelSelect = document.querySelector("#levelSelect");
+const cameraBtn = document.querySelector("#cameraBtn");
+const resetBtn = document.querySelector("#resetBtn");
+const nextLevelBtn = document.querySelector("#nextLevelBtn");
+const muteBtn = document.querySelector("#muteBtn");
+const speedEl = document.querySelector("#speed");
+const lapEl = document.querySelector("#lap");
+const placeEl = document.querySelector("#place");
+const timeEl = document.querySelector("#time");
+const carSelect = document.querySelector("#carSelect");
+const menuTrack = document.querySelector("#menuTrack");
+const powerBtn = document.querySelector("#powerBtn");
+const powerIcon = document.querySelector("#powerIcon");
+const powerName = document.querySelector("#powerName");
+const powerStatus = document.querySelector("#powerStatus");
+const debugPowerup = document.querySelector("#debugPowerup");
+const debugStatus = document.querySelector("#debugStatus");
+let lastPowerIcon;
+let powerups;
+let powerAssets;
+let skidMarks;
+let resetFade;
+let showroom;
+let selectedCarId = "rc";
+let playerCarId = "rc";
+
+const CHECKPOINT_RADIUS = 13.5;
+const TOTAL_LAPS = 3;
+const PHYSICS_STEP = 1 / 120;
+let physicsAccumulator = 0;
+const tempVec = new THREE.Vector3();
+const clock = new THREE.Clock();
+
+const keys = new Map();
+let raceStarted = false;
+const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading });
+let cameraMode = 0;
+let muted = false;
+let elapsedRace = 0;
+let currentLevelIndex = 0;
+let currentLevel = LEVELS[currentLevelIndex];
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(currentLevel.palette.sky);
+scene.fog = new THREE.Fog(currentLevel.palette.fog, 72, 260);
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  powerPreference: "high-performance",
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 520);
+camera.position.set(0, 18, -28);
+
+const listener = new THREE.AudioListener();
+camera.add(listener);
+const audioLoader = new THREE.AudioLoader();
+const engineBuffers = new Map();
+
+const ASSETS = {
+  "/wavs/hit1.wav": gameAssetUrl("/wavs/hit1.wav"),
+  "/wavs/pickup.wav": gameAssetUrl("/wavs/pickup.wav"),
+  "/wavs/skid_normal.wav": gameAssetUrl("/wavs/skid_normal.wav"),
+  "/wavs/turbo.wav": gameAssetUrl("/wavs/turbo.wav"),
+};
+
+const assetUrl = (path) => ASSETS[path] ?? gameAssetUrl(path);
+
+const sounds = {
+  pickup: new THREE.Audio(listener),
+  skid: new THREE.Audio(listener),
+  hit: new THREE.Audio(listener),
+  turbo: new THREE.Audio(listener),
+  ambience: new THREE.Audio(listener),
+};
+
+function loadSound(name, url, volume, loop = false) {
+  audioLoader.load(assetUrl(url), (buffer) => {
+    sounds[name].setBuffer(buffer);
+    sounds[name].setVolume(volume);
+    sounds[name].setLoop(loop);
+  });
+}
+
+loadSound("pickup", "/wavs/pickup.wav", 0.36);
+loadSound("skid", "/wavs/skid_normal.wav", 0.14, true);
+loadSound("hit", "/wavs/hit1.wav", 0.25);
+loadSound("turbo", "/wavs/turbo.wav", 0.18);
+
+function loadAmbience(url) {
+  if (sounds.ambience.isPlaying) sounds.ambience.stop();
+  audioLoader.load(assetUrl(url), (buffer) => {
+    sounds.ambience.setBuffer(buffer);
+    sounds.ambience.setVolume(0.1);
+    sounds.ambience.setLoop(true);
+    if (raceStarted && !muted) sounds.ambience.play();
+  });
+}
+
+
+
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(-42, 74, -26);
+sun.castShadow = true;
+sun.shadow.camera.left = -120;
+sun.shadow.camera.right = 120;
+sun.shadow.camera.top = 120;
+sun.shadow.camera.bottom = -120;
+sun.shadow.mapSize.set(2048, 2048);
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xd9ecff, 0x516b43, 1.3));
+
+const samples = 360;
+let curve;
+let centerline = [];
+let tangents = [];
+let normals = [];
+let checkpoints = [];
+
+let loadedLevel;
+let levelLoading = true;
+let loadGeneration = 0;
+let physics;
+const obstacleRay = new THREE.Raycaster();
+obstacleRay.firstHitOnly = true;
+
+async function buildLevel(level) {
+  const generation = ++loadGeneration;
+  levelLoading = true;
+  raceStarted = false;
+  startBtn.disabled = true;
+  startBtn.textContent = "Loading map...";
+  try {
+    const loaded = await loadLevel(level, __REVOLT_FILES__);
+    if (generation !== loadGeneration) { disposeLevel(loaded); return false; }
+    powerups?.dispose([]);
+    skidMarks?.dispose();
+    if (loadedLevel) { scene.remove(loadedLevel.group); disposeLevel(loadedLevel); }
+    loadedLevel = loaded;
+    loaded.aiRoute = makeAiRoute(loaded.path, loaded.aiPath);
+    currentLevel = level;
+    scene.add(loaded.group);
+    const rgb = loaded.info.FOGCOLOR ?? [128, 160, 192];
+    scene.background = new THREE.Color().setRGB(...rgb.map((v) => v / 255), THREE.SRGBColorSpace);
+    const far = (loaded.info.FARCLIP?.[0] ?? 24000) * RV_SCALE;
+    scene.fog = new THREE.Fog(scene.background, (loaded.info.FOGSTART?.[0] ?? 20000) * RV_SCALE, far);
+    camera.far = far;
+    camera.updateProjectionMatrix();
+    const path = loaded.path;
+    if (path.length > 2) {
+      curve = makeRaceRoute(path);
+      centerline = Array.from({ length: samples }, (_, i) => curve.getPointAt(i / samples));
+      tangents = Array.from({ length: samples }, (_, i) => curve.getTangentAt(i / samples).normalize());
+      normals = tangents.map((t) => new THREE.Vector3(-t.z, 0, t.x).normalize());
+      checkpoints = [0, 45, 90, 135, 180, 225, 270, 315].map((index) => ({ index, position: centerline[index].clone() }));
+    } else {
+      centerline = [];
+      tangents = [];
+      normals = [];
+      checkpoints = [];
+    }
+    physics?.dispose();
+    physics = new MeshPhysics(loaded.group);
+    skidMarks = new SkidMarks(scene);
+    powerups = new PowerupSystem(scene, physics, loaded.group, loaded.objects, powerAssets, playPowerSound);
+
+    window.revoltMap = { id: level.id, ...loaded.stats };
+    loadAmbience(level.ambience);
+    levelLoading = false;
+    startBtn.disabled = false;
+    startBtn.textContent = "Start Race";
+    return true;
+  } catch (error) {
+    if (generation !== loadGeneration) return false;
+    console.error(error);
+    startBtn.textContent = "Map could not load";
+    document.querySelector("#startDescription").textContent = error.message;
+    return false;
+  }
+}
+
+const powerSounds = new Map();
+function playPowerSound(name, position) {
+  if (muted || !raceStarted) return;
+  const sound = powerSounds.get(name);
+  if (!sound?.buffer) return;
+  if (sound.isPlaying) sound.stop();
+  sound.setVolume(Math.min(0.45, 12 / Math.max(25, position.distanceTo(camera.position))));
+  sound.play();
+}
+
+async function makeCar(id, name) {
+  const root = await loadCar(id, name);
+  const sample = engineProfile(root.userData.engineClass).sample;
+  if (!engineBuffers.has(sample)) engineBuffers.set(sample, audioLoader.loadAsync(assetUrl(sample)));
+  root.userData.engine = new CarEngineAudio(listener, root, await engineBuffers.get(sample));
+  scene.add(root);
+  return root;
+}
+
+function nearestTrackData(position) {
+  if (!centerline.length) return { index: 0, lateral: 0 };
+  let bestIndex = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < samples; i += 1) {
+    const dist = position.distanceToSquared(centerline[i]);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIndex = i;
+    }
+  }
+  const p = centerline[bestIndex];
+  const n = normals[bestIndex];
+  const lateral = tempVec.copy(position).sub(p).dot(n);
+  return {
+    index: bestIndex,
+    center: p,
+    tangent: tangents[bestIndex],
+    normal: n,
+    lateral,
+    distance: Math.sqrt(bestDist),
+  };
+}
+
+class CarController {
+  constructor(mesh, options = {}) {
+    this.mesh = mesh;
+    this.name = mesh.name;
+    this.isPlayer = options.isPlayer || false;
+    this.position = mesh.position;
+    this.velocity = new THREE.Vector3();
+    this.heading = options.heading ?? 0;
+    this.steer = 0;
+    this.throttle = 0;
+    this.airborne = false;
+    this.sliding = false;
+    this.bumpCooldown = 0;
+    this.aiTargetOffset = options.aiTargetOffset || 0;
+    this.aiSpeed = options.aiSpeed || 0.9;
+    this.ai = new RaceAI(loadedLevel.aiRoute, this.aiSpeed, mesh.userData.physics);
+    this.lap = 1;
+    this.finished = false;
+    this.nextCheckpoint = 1;
+    this.progress = 0;
+    this.distanceTravelled = 0;
+    this.lastTrackIndex = 0;
+    this.placeScore = 0;
+    this.resetTo(0, options.startOffset || 0, (samples - (options.startIndex || samples)) / 6);
+  }
+
+  resetTo(index, offset = 0, gridRow = 0) {
+    skidMarks?.previous.delete(this);
+    this.sliding = false;
+    if (this.physics !== physics) {
+      this.physics = physics;
+      this.car = physics.createCar(this.mesh);
+    }
+    const heading = index && tangents[index] ? Math.atan2(tangents[index].x, tangents[index].z) : (loadedLevel.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
+    const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
+    const right = new THREE.Vector3(forward.z, 0, -forward.x);
+    const p = index && centerline[index] ? centerline[index].clone() : new THREE.Vector3();
+    p.addScaledVector(right, offset).addScaledVector(forward, -gridRow * 20);
+    const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
+    let placed = physics.placeCar(this.car, p, rotation);
+    if (!placed && this.car.safePose) placed = physics.placeCar(this.car, this.car.safePose.position, this.car.safePose.rotation);
+    if (!placed) physics.placeCar(this.car, new THREE.Vector3(), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (loadedLevel.info.STARTROT?.[0] ?? 0) * Math.PI * 2));
+    this.syncPhysics();
+    this.lastTrackIndex = index;
+    this.nextCheckpoint = 1;
+  }
+
+  restart(index, offset = 0) {
+    this.ai = new RaceAI(loadedLevel.aiRoute, this.aiSpeed, this.mesh.userData.physics);
+    this.resetTo(0, offset, (samples - (index || samples)) / 6);
+    this.lap = 1;
+    this.finished = false;
+    this.nextCheckpoint = 1;
+    this.progress = 0;
+    this.distanceTravelled = 0;
+    this.placeScore = 0;
+    this.bumpCooldown = 0;
+  }
+
+  update(dt) {
+    if (this.finished || dt === 0) return;
+    if (this.isPlayer && resetFade?.active) {
+      this.sliding = false; this.throttle = 0; this.steer = 0;
+      physics.updateVehicle(this.car, dt, 0, 1, 0, false);
+      return;
+    }
+
+    const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
+    const right = new THREE.Vector3(forward.z, 0, -forward.x);
+    const speed = this.velocity.dot(forward);
+    let throttle = 0;
+    let brake = 0;
+    let steerInput = 0;
+    let handbrake = false;
+
+    if (this.isPlayer) {
+      throttle = pressed("KeyW") || pressed("ArrowUp") ? 1 : 0;
+      brake = pressed("KeyS") || pressed("ArrowDown") ? 1 : 0;
+      steerInput = keyboardSteering(pressed("KeyA") || pressed("ArrowLeft"), pressed("KeyD") || pressed("ArrowRight"));
+      handbrake = pressed("Space");
+    } else if (centerline.length) {
+      const controls = this.ai.update(dt, this.position, this.heading, this.velocity, {
+        disabled: this.powerups?.disabled > 0,
+        upsideDown: new THREE.Vector3(0, 1, 0).applyQuaternion(this.mesh.quaternion).y < 0.25,
+        halfExtents: this.car.setup.halfExtents,
+        traffic: racers.filter(racer=>racer!==this).map(racer=>({position:racer.position,velocity:racer.velocity,heading:racer.heading,halfExtents:racer.car.setup.halfExtents})),
+      });
+      throttle = controls.throttle; brake = controls.brake; steerInput = controls.steering;
+      if (controls.recovery) {
+        const recovery = findAiRecovery(physics, this.ai, controls.recoveryDistance);
+        if (recovery) {
+          const placed = physics.placeCar(this.car, recovery.position, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), recovery.heading));
+          if (placed) this.ai.acceptRecovery(recovery.distance);
+          this.steer = 0; this.syncPhysics();
+        }
+      }
+    }
+
+    this.steer = THREE.MathUtils.lerp(this.steer, steerInput, 1 - Math.exp(-dt * (this.isPlayer ? 12 : 7.5)));
+    const trackData = nearestTrackData(this.position);
+    const reversing = brake && speed < 2;
+    this.throttle = throttle - (reversing ? brake : 0);
+    if (this.powerups?.disabled > 0) this.throttle = 0;
+    physics.updateVehicle(this.car, dt, this.throttle * (this.powerups?.boost > 0 ? 1.1 : 1), reversing ? 0 : brake, this.steer, handbrake, this.powerups?.slippery > 0 ? 0.025 : 1, this.isPlayer ? 1.45 : 1);
+    this.bumpCooldown = Math.max(0, this.bumpCooldown - dt);
+
+    this.updateProgress(trackData);
+    this.interact(speed, handbrake);
+  }
+
+  syncPhysics() {
+    this.position.copy(this.car.body.translation());
+    this.mesh.quaternion.copy(this.car.body.rotation());
+    this.velocity.copy(this.car.body.linvel());
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+    this.heading = Math.atan2(forward.x, forward.z);
+    this.airborne = true;
+    this.mesh.userData.wheels.forEach((wheel, i) => {
+      const suspension = this.car.vehicle.wheelSuspensionLength(i) ?? 0.6;
+      wheel.position.y = this.car.setup.wheels[i].position.y - wheel.parent.position.y + 0.6 - suspension;
+      setWheelPose(wheel, this.car.vehicle.wheelSteering(i) ?? 0, this.car.vehicle.wheelRotation(i) ?? 0);
+      if (this.car.vehicle.wheelIsInContact(i)) this.airborne = false;
+    });
+    if (this.position.y < physics.bounds.min.y - 50) this.resetTo(this.lastTrackIndex);
+  }
+
+  updateProgress(trackData) {
+    if (!checkpoints.length) return;
+    if (!this.isPlayer) {
+      this.lastTrackIndex = trackData.index;
+      this.lap = this.ai.laps + 1;
+      this.progress = this.ai.distance / this.ai.length;
+      this.placeScore = (this.ai.laps + this.progress) * samples;
+      if(this.ai.laps>=TOTAL_LAPS&&!this.finished) {
+        this.finished=true;
+        physics.updateVehicle(this.car,PHYSICS_STEP,0,1,0,false);
+        physics.parkCar(this.car);this.syncPhysics();
+      }
+      return;
+    }
+    let delta = trackData.index - this.lastTrackIndex;
+    if (delta < -samples / 2) delta += samples;
+    if (delta > samples / 2) delta -= samples;
+    if (delta > 0) this.distanceTravelled += delta;
+    this.lastTrackIndex = trackData.index;
+    this.progress = trackData.index / samples;
+
+    const checkpoint = checkpoints[this.nextCheckpoint];
+    if (this.position.distanceTo(checkpoint.position) < CHECKPOINT_RADIUS) {
+      this.nextCheckpoint += 1;
+      if (this.nextCheckpoint >= checkpoints.length) this.nextCheckpoint = 0;
+    }
+
+    if (trackData.index < 8 && this.nextCheckpoint === 0 && this.velocity.length() > 4) {
+      this.lap += 1;
+      this.nextCheckpoint = 1;
+      if (this.lap > TOTAL_LAPS) {
+        this.finished = true;
+        this.velocity.multiplyScalar(0.25);
+      }
+    }
+
+    this.placeScore = (this.lap - 1) * samples + this.distanceTravelled;
+  }
+
+  interact(speed, handbrake) {
+    this.sliding = isSkidding({ speed, lateralSpeed: this.velocity.dot(new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading))), steer: this.steer, handbrake, airborne: this.airborne });
+    if (this.isPlayer) {
+      const sliding = this.sliding;
+      if (sliding && sounds.skid.buffer && !sounds.skid.isPlaying && !muted) sounds.skid.play();
+      if ((!sliding || muted) && sounds.skid.isPlaying) sounds.skid.stop();
+    }
+  }
+}
+
+await initializePhysics();
+powerAssets = await PowerupSystem.loadAssets();
+for (const name of new Set([...POWERUPS.map((p) => p.sound), "pickup", "firebang", "wbombhit"])) {
+  const sound = new THREE.Audio(listener);
+  powerSounds.set(name, sound);
+  audioLoader.load(assetUrl(`/wavs/${name}.wav`), (buffer) => sound.setBuffer(buffer));
+}
+await buildLevel(currentLevel);
+
+const playerMesh = await makeCar("rc", "RC Bandit");
+const racers = [
+  new CarController(playerMesh, { isPlayer: true, startIndex: 0, startOffset: -3.3 }),
+  new CarController(await makeCar("volken", "Volken Turbo"), { startIndex: 354, startOffset: 3.2, aiTargetOffset: 1.2, aiSpeed: 0.92 }),
+  new CarController(await makeCar("phat", "Phat Slug"), { startIndex: 348, startOffset: -1.4, aiTargetOffset: -2.2, aiSpeed: 0.88 }),
+  new CarController(await makeCar("cougar", "Cougar"), { startIndex: 342, startOffset: 3.8, aiTargetOffset: 2.8, aiSpeed: 0.96 }),
+];
+let player = racers[0];
+powerups.reset(racers);
+
+for (const item of POWERUPS) {
+  const option = document.createElement("option");
+  option.value = item.id; option.textContent = item.name;
+  debugPowerup.append(option);
+}
+function debugGivePowerup() {
+  if (!raceStarted || levelLoading) return;
+  powerups.debugGive(player, debugPowerup.value);
+  updateHud();
+}
+debugPowerup.addEventListener("change", debugGivePowerup);
+document.querySelector("#debugGive").addEventListener("click", debugGivePowerup);
+document.querySelector("#debugUse").addEventListener("click", () => {
+  if (raceStarted && !levelLoading) powerups.fire(player, racers);
+});
+document.querySelector("#debugClear").addEventListener("click", () => {
+  if (raceStarted && !levelLoading) { powerups.debugClear(player); updateHud(); }
+});
+
+for (const level of LEVELS) {
+  const option = document.createElement("option");
+  option.value = level.id;
+  option.textContent = level.name;
+  levelSelect.append(option);
+  menuTrack.append(option.cloneNode(true));
+}
+levelSelect.value = currentLevel.id;
+menuTrack.value = currentLevel.id;
+
+showroom = await Showroom.create(renderer, __REVOLT_FILES__);
+for (const [index, car] of showroom.cars.entries()) {
+  const option = document.createElement("option");
+  option.value = index; option.textContent = car.name; carSelect.append(option);
+}
+function selectCar(index) {
+  const car = showroom.select(index);
+  selectedCarId = car.id; carSelect.value = showroom.selected;
+  document.querySelector("#carName").textContent = car.name;
+  const stats = document.querySelector("#carStats");
+  stats.replaceChildren();
+  const entries = [["Class", car.engineClass === 1 ? "Glow / Petrol" : "Electric"], ["Rating", ["Rookie", "Amateur", "Advanced", "Semi-Pro", "Pro"][car.rating] ?? "Special"], ["Speed", `${car.speed.toFixed(1)} mph`], ["Acceleration", car.acceleration.toFixed(1)], ["Weight", `${car.weight.toFixed(2)} kg`], ["Transmission", ["4WD", "FWD", "RWD"][car.transmission] ?? "4WD"]];
+  for (const [label, value] of entries) {
+    const term = document.createElement("dt"), detail = document.createElement("dd");
+    term.textContent = label; detail.textContent = value;
+    if (["Speed", "Acceleration", "Weight"].includes(label)) {
+      const meter = document.createElement("meter");
+      meter.min = 0; meter.max = label === "Speed" ? 65 : label === "Acceleration" ? 15 : 3;
+      meter.value = label === "Speed" ? car.speed : label === "Acceleration" ? car.acceleration : car.weight;
+      meter.setAttribute("aria-label", label); detail.prepend(meter);
+    }
+    stats.append(term, detail);
+  }
+  canvas.dataset.selectedCar = car.id;
+}
+selectCar(0);
+document.querySelector("#startDescription").textContent = "";
+carSelect.addEventListener("change", () => selectCar(Number(carSelect.value)));
+document.querySelector("#prevCar").addEventListener("click", () => selectCar(showroom.selected - 1));
+document.querySelector("#nextCar").addEventListener("click", () => selectCar(showroom.selected + 1));
+canvas.addEventListener("pointerdown", (event) => {
+  if (raceStarted || levelLoading) return;
+  const rect = canvas.getBoundingClientRect();
+  const selected = showroom.pick((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
+  if (selected) selectCar(showroom.selected);
+});
+function openMenu() {
+  resetFade?.cancel(); resetBtn.disabled = false;
+  raceStarted = false; keys.clear(); touchControls.clear(); physicsAccumulator = 0;
+  startOverlay.classList.remove("hidden");
+  document.querySelector("#game").classList.add("menu-open");
+  if (sounds.ambience.isPlaying) sounds.ambience.stop();
+  if (sounds.skid.isPlaying) sounds.skid.stop();
+  for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();
+}
+document.querySelector("#menuBtn").addEventListener("click", openMenu);
+
+async function switchLevel(nextIndex) {
+  currentLevelIndex = (nextIndex + LEVELS.length) % LEVELS.length;
+  currentLevel = LEVELS[currentLevelIndex];
+  levelSelect.value = currentLevel.id;
+  menuTrack.value = currentLevel.id;
+  elapsedRace = 0;
+  physicsAccumulator = 0;
+  openMenu();
+  const built = await buildLevel(currentLevel);
+  if (!built) return;
+  racers[0].restart(0, -3.3);
+  racers[1].restart(354, 3.2);
+  racers[2].restart(348, -1.4);
+  racers[3].restart(342, 3.8);
+  powerups.reset(racers);
+  updateCamera(1);
+  updateHud();
+}
+
+function pressed(code) {
+  return keys.get(code) === true || touchControls.pressed(code);
+}
+
+function resetPlayer() {
+  if (!raceStarted || levelLoading || resetFade?.active) return;
+  const back = Math.max(0, player.lastTrackIndex - 4);
+  const offset = THREE.MathUtils.clamp(nearestTrackData(player.position).lateral, -4, 4);
+  resetFade = new CarResetFade(player.mesh);
+  resetFade.start(() => player.resetTo(back, offset));
+  resetBtn.disabled = true; player.sliding = false;
+  skidMarks.previous.delete(player);
+  if (sounds.skid.isPlaying) sounds.skid.stop();
+}
+
+function resize() {
+  const { clientWidth, clientHeight } = canvas;
+  renderer.setSize(clientWidth, clientHeight, false);
+  camera.aspect = clientWidth / clientHeight;
+  camera.updateProjectionMatrix();
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const secs = Math.floor(seconds % 60).toString().padStart(2, "0");
+  return `${mins}:${secs}`;
+}
+
+function updateCamera(dt) {
+  const forward = tempVec.set(Math.sin(player.heading), 0, Math.cos(player.heading));
+  const speed = player.velocity.length();
+  let desired;
+  let lookAt;
+
+  if (cameraMode === 0) {
+    desired = player.position.clone().addScaledVector(forward, -16 - speed * 0.16).add(new THREE.Vector3(0, 7.5, 0));
+    lookAt = player.position.clone().addScaledVector(forward, 11).add(new THREE.Vector3(0, 2.2, 0));
+  } else if (cameraMode === 1) {
+    desired = player.position.clone().add(new THREE.Vector3(0, 42, 0)).addScaledVector(forward, -4);
+    lookAt = player.position.clone().addScaledVector(forward, 5);
+  } else {
+    desired = player.position.clone().addScaledVector(forward, 3.2).add(new THREE.Vector3(0, 2.2, 0));
+    lookAt = player.position.clone().addScaledVector(forward, 28).add(new THREE.Vector3(0, 1.2, 0));
+  }
+
+  camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
+  if (loadedLevel && cameraMode === 0) {
+    const target = player.position.clone().add(new THREE.Vector3(0, 2, 0));
+    const direction = camera.position.clone().sub(target);
+    obstacleRay.set(target, direction.clone().normalize());
+    obstacleRay.far = direction.length();
+    const hit = obstacleRay.intersectObject(loadedLevel.group, true)[0];
+    if (hit) camera.position.copy(target).addScaledVector(obstacleRay.ray.direction, Math.max(1, hit.distance - 0.8));
+  }
+  camera.lookAt(lookAt);
+}
+
+function updateHud() {
+  const speed = Math.round(player.velocity.length() * 2.7);
+  const sorted = [...racers].sort((a, b) => b.placeScore - a.placeScore);
+  const place = sorted.indexOf(player) + 1;
+  speedEl.textContent = speed.toString();
+  lapEl.textContent = `${Math.min(player.lap, TOTAL_LAPS)}/${TOTAL_LAPS}`;
+  placeEl.textContent = `${place}/${racers.length}`;
+  timeEl.textContent = formatTime(elapsedRace);
+  const state = player.powerups;
+  if (state) {
+    const icon = state.bomb > 0 ? POWERUPS[3] : state.rolling > 0 ? POWERUPS[Math.floor(elapsedRace * 12) % 10] : state.held;
+    if (icon !== lastPowerIcon) { powerups.drawIcon(powerIcon, icon); lastPowerIcon = icon; }
+    powerName.textContent = state.bomb > 0 ? "Bomb" : state.rolling > 0 ? "Selecting..." : state.held?.name ?? "No Pick Up";
+    powerStatus.textContent = state.bomb > 0 ? `${state.bomb.toFixed(1)} s` : state.disabled > 0 ? `Power cut: ${state.disabled.toFixed(1)} s` : state.boost > 0 ? `Turbo: ${state.boost.toFixed(1)} s` : state.electro > 0 ? `Pulse: ${state.electro.toFixed(1)} s` : state.shots > 0 ? `${state.shots} / ${state.held.shots}` : "";
+    powerBtn.disabled = !state.held || state.rolling > 0 || state.cooldown > 0 || !raceStarted;
+    debugStatus.textContent = `${powerName.textContent}${powerStatus.textContent ? ` - ${powerStatus.textContent}` : ""}`;
+    document.querySelector("#debugUse").disabled = powerBtn.disabled;
+  }
+}
+
+
+
+function drawMinimap() {
+  const w = mapCanvas.width;
+  const h = mapCanvas.height;
+  mapCtx.clearRect(0, 0, w, h);
+  mapCtx.fillStyle = "rgba(8, 10, 13, 0.58)";
+  mapCtx.fillRect(0, 0, w, h);
+  mapCtx.save();
+  mapCtx.translate(w / 2, h / 2);
+  const bounds = centerline.length ? new THREE.Box3().setFromPoints(centerline) : physics.bounds;
+  const center = bounds.getCenter(new THREE.Vector3());
+  const span = bounds.getSize(new THREE.Vector3());
+  const mapScale = Math.min(w / Math.max(span.x, 1), h / Math.max(span.z, 1)) * 0.8;
+  mapCtx.scale(mapScale, mapScale);
+  mapCtx.translate(-center.x, -center.z);
+  mapCtx.lineWidth = 14;
+  mapCtx.lineCap = "round";
+  mapCtx.strokeStyle = "rgba(255,255,255,0.18)";
+  mapCtx.beginPath();
+  centerline.forEach((p, i) => {
+    const x = p.x;
+    const y = p.z;
+    if (i === 0) mapCtx.moveTo(x, y);
+    else mapCtx.lineTo(x, y);
+  });
+  mapCtx.closePath();
+  mapCtx.stroke();
+  mapCtx.lineWidth = 3;
+  mapCtx.strokeStyle = "#f1c94b";
+  mapCtx.stroke();
+  for (const racer of racers) {
+    mapCtx.fillStyle = racer.isPlayer ? "#ff3939" : "#ffffff";
+    mapCtx.beginPath();
+    mapCtx.arc(racer.position.x, racer.position.z, (racer.isPlayer ? 4 : 3) / mapScale, 0, Math.PI * 2);
+    mapCtx.fill();
+  }
+  mapCtx.restore();
+}
+
+function animate() {
+  const dt = Math.min(clock.getDelta(), 0.033);
+  resetFade?.update(dt);
+  resetBtn.disabled = resetFade?.active ?? false;
+  if (raceStarted) elapsedRace += dt;
+
+  if (raceStarted && !levelLoading) {
+    physicsAccumulator += dt;
+    while (physicsAccumulator >= PHYSICS_STEP) {
+      for (const racer of racers) racer.update(PHYSICS_STEP);
+      physics.step();
+      for (const racer of racers) { physics.checkCar(racer.car, PHYSICS_STEP, racers.map(other=>other.car)); racer.syncPhysics(); skidMarks.track(racer); }
+      powerups.update(PHYSICS_STEP, racers);
+      physicsAccumulator -= PHYSICS_STEP;
+    }
+  }
+  if (raceStarted && !levelLoading) skidMarks.update(dt);
+  for (const racer of racers) racer.mesh.userData.engine.update(dt, {
+    running: raceStarted && !levelLoading && !(racer.powerups?.disabled > 0),
+    muted,
+    speed: racer.velocity.length(),
+    throttle: racer.finished ? 0 : racer.throttle,
+    airborne: racer.airborne,
+  });
+  updateCamera(dt);
+  updateHud();
+  drawMinimap();
+
+  if (!raceStarted && showroom) showroom.render(renderer, dt, camera.aspect);
+  else renderer.render(scene, camera);
+  canvas.dataset.view = raceStarted ? "race" : "menu";
+  canvas.dataset.physics = JSON.stringify({ position: player.position.toArray(), velocity: player.velocity.toArray(), airborne: player.airborne, steer: player.steer, triangleCount: physics.triangleCount });
+  canvas.dataset.engines = JSON.stringify(racers.map((racer) => ({ name: racer.name, engineClass: racer.mesh.userData.engineClass, sample: racer.mesh.userData.engine.profile.sample, playing: racer.mesh.userData.engine.audio.isPlaying, pitch: racer.mesh.userData.engine.audio.getPlaybackRate(), volume: racer.mesh.userData.engine.audio.getVolume() })));
+  canvas.dataset.powerups = JSON.stringify({ held: player.powerups.held?.id, shots: player.powerups.shots, bomb: player.powerups.bomb, boost: player.powerups.boost, pickups: powerups.pickups.map((p) => ({ position: p.position.toArray(), active: p.active, model: p.mesh.name })), projectiles: powerups.projectiles.length, hazards: powerups.hazards.length });
+  canvas.dataset.opponents = JSON.stringify(racers.slice(1).map((racer) => ({ name: racer.name, position: racer.position.toArray(), lap: racer.lap, progress: racer.progress, speed: racer.velocity.length(), recoveries: racer.ai.recoveryCount })));
+  canvas.dataset.skidMarks = skidMarks.count;
+  canvas.dataset.resetOpacity = resetFade?.opacity ?? 1;
+  requestAnimationFrame(animate);
+}
+
+window.addEventListener("resize", resize);
+window.addEventListener("keydown", (event) => {
+  if (!raceStarted) {
+    if (event.target.matches("select, button")) return;
+    if (event.code === "ArrowLeft") { event.preventDefault(); selectCar(showroom.selected - 1); }
+    if (event.code === "ArrowRight") { event.preventDefault(); selectCar(showroom.selected + 1); }
+    if (event.code === "Enter") startBtn.click();
+    return;
+  }
+  if (event.code === "Escape") { openMenu(); return; }
+  if (event.target.matches("select, input, textarea")) return;
+  if (["KeyF", "ControlLeft"].includes(event.code)) { event.preventDefault(); if (!event.repeat) powerups.fire(player, racers); }
+  keys.set(event.code, true);
+  if (event.code === "KeyR") resetPlayer();
+  if (event.code === "KeyC") cameraMode = (cameraMode + 1) % 3;
+});
+window.addEventListener("keyup", (event) => keys.set(event.code, false));
+window.addEventListener("blur", () => keys.clear());
+
+startBtn.addEventListener("click", async () => {
+  if (levelLoading) return;
+  startBtn.disabled = true;
+  if (listener.context.state === "suspended") listener.context.resume();
+  try {
+    if (playerCarId !== selectedCarId) {
+      powerups.reset(racers);
+      const choice = showroom.cars.find((car) => car.id === selectedCarId);
+      const mesh = await makeCar(choice.id, choice.name);
+      scene.remove(player.mesh);
+      physics.world.removeVehicleController(player.car.vehicle);
+      physics.world.removeRigidBody(player.car.body);
+      player.mesh.userData.engine.audio.disconnect();
+      player.mesh.traverse((o) => { o.geometry?.dispose(); if (o.material) { o.material.map?.dispose(); o.material.dispose(); } });
+      racers[0] = player = new CarController(mesh, { isPlayer: true, startOffset: -3.3 });
+      playerCarId = choice.id;
+    }
+    elapsedRace = 0;
+    skidMarks.clear();
+    racers.forEach((racer, i) => racer.restart(i ? 360 - i * 6 : 0, [-3.3, 3.2, -1.4, 3.8][i]));
+    powerups.reset(racers);
+  } catch (error) {
+    console.error(error); document.querySelector("#startDescription").textContent = error.message;
+    startBtn.disabled = false; return;
+  }
+  startBtn.disabled = false;
+  raceStarted = true;
+  startOverlay.classList.add("hidden");
+  document.querySelector("#game").classList.remove("menu-open");
+  updateCamera(1);
+  if (sounds.ambience.buffer && !sounds.ambience.isPlaying && !muted) sounds.ambience.play();
+});
+levelSelect.addEventListener("change", () => {
+  const next = LEVELS.findIndex((level) => level.id === levelSelect.value);
+  if (next >= 0) switchLevel(next);
+});
+menuTrack.addEventListener("change", () => switchLevel(LEVELS.findIndex((level) => level.id === menuTrack.value)));
+cameraBtn.addEventListener("click", () => {
+  cameraMode = (cameraMode + 1) % 3;
+});
+resetBtn.addEventListener("click", resetPlayer);
+powerBtn.addEventListener("click", () => { if (raceStarted && !levelLoading) powerups.fire(player, racers); });
+nextLevelBtn.addEventListener("click", () => {
+  switchLevel(currentLevelIndex + 1);
+});
+muteBtn.addEventListener("click", () => {
+  muted = !muted;
+  muteBtn.textContent = muted ? "Muted" : "Sound";
+  if (muted && sounds.skid.isPlaying) sounds.skid.stop();
+  if (muted && sounds.ambience.isPlaying) sounds.ambience.stop();
+  if (muted) for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();
+  if (!muted && raceStarted && sounds.ambience.buffer && !sounds.ambience.isPlaying) sounds.ambience.play();
+});
+
+resize();
+updateCamera(1);
+animate();
+
+    </script>
+    <script type="text/plain" data-game-module="physics.js">
+import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+
+let initialization;
+export function keyboardSteering(left, right) {
+  // Looking forward along +Z, +X is left on the chase camera.
+  return Number(left) - Number(right);
+}
+
+export function initializePhysics() {
+  return initialization ??= RAPIER.init();
+}
+
+export function meshTriangles(group) {
+  group.updateMatrixWorld(true);
+  const meshes = [];
+  group.traverse((object) => {
+    if (!object.isMesh) return;
+    for (let parent = object; parent; parent = parent.parent) {
+      if (parent.userData.noCollision) return;
+    }
+    meshes.push(object);
+  });
+  const vertexCount = meshes.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.count, 0);
+  const indexCount = meshes.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count), 0);
+  const vertices = new Float32Array(vertexCount * 3), indices = new Uint32Array(indexCount);
+  const vertex = new THREE.Vector3();
+  let vertexOffset = 0, indexOffset = 0;
+  for (const mesh of meshes) {
+    const position = mesh.geometry.attributes.position, index = mesh.geometry.index;
+    for (let i = 0; i < position.count; i++) {
+      vertex.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      vertex.toArray(vertices, (vertexOffset + i) * 3);
+    }
+    for (let i = 0; i < (index?.count ?? position.count); i++) indices[indexOffset++] = vertexOffset + (index ? index.getX(i) : i);
+    vertexOffset += position.count;
+  }
+  return { vertices, indices };
+}
+
+export class MeshPhysics {
+  constructor(group) {
+    this.world = new RAPIER.World({ x: 0, y: -42, z: 0 });
+    this.world.timestep = 1 / 120;
+    this.world.integrationParameters.numSolverIterations = 8;
+    this.world.integrationParameters.maxCcdSubsteps = 4;
+    const { vertices, indices } = meshTriangles(group);
+    this.triangleCount = indices.length / 3;
+    this.bounds = new THREE.Box3().setFromArray(vertices);
+    // One welded trimesh avoids false collisions at material/texture boundaries.
+    this.terrain = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES | RAPIER.TriMeshFlags.ORIENTED).setFriction(0.8).setRestitution(0));
+    this.world.step();
+  }
+
+  groundAt(position, above = 1, below = 20) {
+    const ray = new RAPIER.Ray({ x: position.x, y: position.y + above, z: position.z }, { x: 0, y: -1, z: 0 });
+    const hit = this.world.castRayAndGetNormal(ray, above + below, false, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
+    return hit && hit.normal.y > 0.15 ? position.y + above - hit.timeOfImpact : null;
+  }
+
+  createCar(mesh) {
+    const setup = mesh.userData.physics;
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true).setSoftCcdPrediction(0.5).setLinearDamping(0.15).setAngularDamping(1.5));
+    const { halfExtents: size, center } = setup;
+    const hull = setup.bodyVertices?.length >= 12 ? RAPIER.ColliderDesc.convexHull(setup.bodyVertices) : null;
+    const shapeOffset = hull ? new THREE.Vector3() : center.clone();
+    const descriptor = hull ?? RAPIER.ColliderDesc.cuboid(size.x, size.y, size.z).setTranslation(center.x, center.y, center.z);
+    const collider = this.world.createCollider(descriptor.setMass(8).setFriction(0.3).setRestitution(0.02).setContactSkin(0.02), body);
+    const vehicle = this.world.createVehicleController(body);
+    vehicle.indexUpAxis = 1;
+    vehicle.setIndexForwardAxis = 2;
+    for (const wheel of setup.wheels) {
+      const connection = { x: wheel.position.x, y: wheel.position.y + 0.6, z: wheel.position.z };
+      vehicle.addWheel(connection, { x: 0, y: -1, z: 0 }, { x: -1, y: 0, z: 0 }, 0.6, wheel.radius);
+      const i = vehicle.numWheels() - 1;
+      vehicle.setWheelSuspensionStiffness(i, 70);
+      vehicle.setWheelSuspensionCompression(i, 12);
+      vehicle.setWheelSuspensionRelaxation(i, 12);
+      vehicle.setWheelMaxSuspensionTravel(i, 0.5);
+      vehicle.setWheelMaxSuspensionForce(i, 2000);
+      vehicle.setWheelFrictionSlip(i, 2.5);
+      vehicle.setWheelSideFrictionStiffness(i, 1);
+    }
+    return { body, vehicle, setup, collider, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false };
+  }
+
+  overlapsCar(car, position, rotation) {
+    const center = car.shapeOffset.clone().applyQuaternion(rotation).add(position);
+    const bodyCenter = car.setup.center.clone().applyQuaternion(rotation).add(position);
+    if (this.terrain.projectPoint(bodyCenter, true).isInside) return true;
+    const size=car.setup.halfExtents;
+    const bottom=position.y-1,top=bodyCenter.y+size.y+0.05;
+    const clearanceCenter=new THREE.Vector3(bodyCenter.x,(bottom+top)/2,bodyCenter.z);
+    const clearanceShape=new RAPIER.Cuboid(size.x+0.4,(top-bottom)/2,size.z+0.4);
+    if(this.world.intersectionWithShape(clearanceCenter,rotation,clearanceShape,RAPIER.QueryFilterFlags.EXCLUDE_FIXED|RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC|RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,undefined,car.collider,car.body)) return true;
+    return Boolean(this.world.intersectionWithShape(center, rotation, car.collider.shape, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, car.collider, car.body));
+  }
+
+  placeCar(car, requested, rotation) {
+    const spacing = Math.max(4, car.setup.halfExtents.x * 2 + 1);
+    const offsets = [new THREE.Vector3()];
+    for (let ring = 1; ring <= 6; ring++) for (let i = 0; i < 8; i++) offsets.push(new THREE.Vector3(Math.sin(i * Math.PI / 4) * spacing * ring, 0, Math.cos(i * Math.PI / 4) * spacing * ring));
+    for (const offset of offsets) {
+      const position = requested.clone().add(offset);
+      const floor = this.groundAt(position, 3, 40);
+      if (floor === null) continue;
+      const clearance = Math.max(0.8, car.setup.halfExtents.y - car.setup.center.y + 0.15);
+      for (const lift of [0, 0.5, 1]) {
+        position.y = floor + clearance + lift;
+        if (this.overlapsCar(car, position, rotation)) continue;
+        car.body.setTranslation(position, true); car.body.setRotation(rotation, true);
+        car.body.setLinvel({ x: 0, y: 0, z: 0 }, true); car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        this.world.propagateModifiedBodyPositionsToColliders();
+        car.safePose = { position: position.clone(), rotation: new THREE.Quaternion().copy(rotation) };
+        car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  parkCar(car) {
+    const position=new THREE.Vector3().copy(car.body.translation()),rotation=new THREE.Quaternion().copy(car.body.rotation());
+    const side=new THREE.Vector3(1,0,0).applyQuaternion(rotation);side.y=0;side.normalize();
+    for(const distance of [24,-24,36,-36]) {
+      if(this.placeCar(car,position.clone().addScaledVector(side,distance),rotation)) return true;
+    }
+    return false;
+  }
+
+  checkCar(car, dt, cars = []) {
+    const position = new THREE.Vector3().copy(car.body.translation());
+    const rotation = new THREE.Quaternion().copy(car.body.rotation());
+    const velocity = car.body.linvel();
+    if (![...position.toArray(), ...rotation.toArray(), velocity.x, velocity.y, velocity.z].every(Number.isFinite)) {
+      if (car.safePose) this.placeCar(car, car.safePose.position, car.safePose.rotation);
+      return;
+    }
+    const contact = car.collider.contactCollider(this.terrain, 0);
+    const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).y;
+    const stationary = Math.hypot(velocity.x, velocity.z) < 2;
+    car.blockedTime = stationary && (upright < 0.25 || (car.driveIntent && contact)) ? car.blockedTime + dt : 0;
+    const stacked=cars.some(other=>{
+      if(other===car||position.y-other.body.translation().y<1) return false;
+      const support=car.collider.contactCollider(other.collider,0.03);
+      return support&&support.distance<0.03&&support.normal1.y< -0.5;
+    });
+    car.stackedTime=stacked?car.stackedTime+dt:0;
+    const bodyCenter = car.setup.center.clone().applyQuaternion(rotation).add(position);
+    const deeplyEmbedded = (contact && contact.distance < -0.2) || this.terrain.projectPoint(bodyCenter, true).isInside;
+    car.embeddedTime = deeplyEmbedded ? car.embeddedTime + dt : 0;
+    if ((car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
+      this.placeCar(car, car.safePose.position, car.safePose.rotation);
+      return;
+    }
+    // Keep a previously clear resting pose, not the latest position pressed into a wall.
+    if (!contact && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {
+      car.safePose = { position, rotation };
+    }
+  }
+
+  updateVehicle(car, dt, throttle, brake, steering, handbrake, traction = 1, steeringGain = 1) {
+    car.driveIntent = Math.abs(throttle) > 0.1;
+    const slippery = traction < 1;
+    car.body.setAngularDamping(slippery ? 0.12 : 1.5);
+    car.collider?.setFriction(slippery ? 0.015 : 0.3);
+    const totalDriveRatio=car.setup.wheels.reduce((sum,wheel)=>sum+((wheel.powered??true)?(wheel.engineRatio??1):0),0);
+    for (let i = 0; i < car.vehicle.numWheels(); i++) {
+      const front = car.setup.wheels[i].position.z > 0;
+      const wheel = car.setup.wheels[i];
+      car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * (wheel.steerRatio ?? 0.45) * steeringGain, -0.8, 0.8) : 0);
+      car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * 360 * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
+      car.vehicle.setWheelBrake(i, brake * 18 + (handbrake && !front ? 30 : 0));
+      car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction);
+      car.vehicle.setWheelSideFrictionStiffness(i, traction);
+    }
+    car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
+  }
+
+  step() { this.world.step(); }
+  dispose() { this.world.free(); }
+}
+
+    </script>
+    <script type="text/plain" data-game-module="powerups.js">
+import * as THREE from "three";
+import { gameAssetUrl } from "./assets.js";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { parsePrm, makeMeshes, decodeBitmap } from "./revolt.js";
+
+export const POWERUPS = [
+  { id: "shockwave", name: "Shockwave", shots: 1, icon: [64, 192], sound: "shockfire" },
+  { id: "firework", name: "Firework", shots: 1, icon: [64, 224], sound: "firefire" },
+  { id: "fireworks", name: "Firework Pack", shots: 3, icon: [96, 224], sound: "firefire" },
+  { id: "bomb", name: "Bomb", shots: 1, icon: [32, 224], sound: "fuse" },
+  { id: "balloons", name: "Water Balloons", shots: 3, icon: [128, 224], sound: "wbombfire" },
+  { id: "electro", name: "Electro Pulse", shots: 1, icon: [224, 224], sound: "electrozap" },
+  { id: "oil", name: "Oil Slick", shots: 1, icon: [192, 224], sound: "oildrop" },
+  { id: "bearing", name: "Ball Bearing", shots: 1, icon: [0, 192], sound: "balldrop" },
+  { id: "battery", name: "Turbo Battery", shots: 1, icon: [32, 192], sound: "turbo" },
+  { id: "clone", name: "Clone Pick Up", shots: 1, icon: [160, 224], sound: "pickgen" },
+  { id: "star", name: "Global Pulse", shots: 1, icon: [96, 192], sound: "starfire" },
+];
+const WEIGHTS = { first: [10,18,5,10,5,18,18,4,8,9,0], middle: [20,10,10,10,10,10,10,10,10,10,0], last: [40,3,15,2,15,2,2,21,17,2,1], cpu: [20,10,5,10,10,5,15,15,10,10,0] };
+export function choosePowerup(place, count, cpu, random = Math.random) {
+  const weights = WEIGHTS[cpu ? "cpu" : place === 1 ? "first" : place === count ? "last" : "middle"];
+  let roll = random() * weights.reduce((sum, weight) => sum + weight, 0);
+  for (let i = 0; i < weights.length; i++) { roll -= weights[i]; if (roll < 0) return POWERUPS[i]; }
+  return POWERUPS[9];
+}
+export function createPowerState() {
+  return { held: null, shots: 0, rolling: 0, cooldown: 0, boost: 0, disabled: 0, slippery: 0, electro: 0, bomb: 0, bombLock: 0 };
+}
+export function awardPowerup(state, powerup, roulette = true) {
+  if (state.held || state.bomb > 0 || state.rolling > 0) return false;
+  state.held = powerup; state.shots = powerup.shots; state.rolling = roulette ? 1 : 0;
+  if (powerup.id === "bomb" && !roulette) { state.bomb = 10; state.held = null; state.shots = 0; }
+  return true;
+}
+
+export class PowerupSystem {
+  static async loadAssets() {
+    const bitmap = async (name) => decodeBitmap(await (await fetch(gameAssetUrl(`/gfx/${name}.bmp`))).arrayBuffer());
+    const [fx, icons, explosions] = await Promise.all([bitmap("fxpage1"), bitmap("fxpage2"), bitmap("fxpage3")]);
+    const models = {};
+    for (const name of ["pickup", "star", "firework", "wbomb", "ball", "fuse"]) {
+      const source = parsePrm(await (await fetch(gameAssetUrl(`/models/${name}.m`))).arrayBuffer());
+      const mesh = makeMeshes([source], { 0: fx }, [0, 0, 0]);
+      const bounds = new THREE.Box3().setFromObject(mesh), center = bounds.getCenter(new THREE.Vector3());
+      mesh.children.forEach((child) => child.position.sub(center));
+      models[name] = mesh;
+    }
+    return { models, fx, icons, explosions };
+  }
+
+  constructor(scene, physics, terrain, objects, assets, playSound = () => {}) {
+    this.scene = scene; this.physics = physics; this.terrain = terrain; this.assets = assets; this.playSound = playSound;
+    this.group = new THREE.Group(); this.group.name = "Original pickups and weapons"; scene.add(this.group);
+    this.pickups = objects.filter((o) => o.type === 30 || (o.type === 50 && o.flags[0] === 0)).map((o) => {
+      const mesh = assets.models[o.type === 50 ? "star" : "pickup"].clone(true);
+      mesh.name = o.type === 50 ? "Original global-pulse star" : "Original pickup.m";
+      mesh.position.copy(o.position); this.group.add(mesh);
+      return { mesh, position: o.position.clone(), star: o.type === 50, active: true, respawn: 0 };
+    });
+    this.projectiles = []; this.hazards = []; this.effects = []; this.time = 0;
+    this.ray = new THREE.Raycaster(); this.ray.firstHitOnly = true;
+  }
+
+  reset(racers) {
+    for (const entity of [...this.projectiles, ...this.hazards, ...this.effects]) this.remove(entity);
+    this.projectiles = []; this.hazards = []; this.effects = []; this.time = 0;
+    for (const pickup of this.pickups) { pickup.active = true; pickup.respawn = 0; pickup.mesh.visible = true; }
+    for (const racer of racers) {
+      this.restoreCar(racer); racer.powerups = createPowerState();
+    }
+  }
+
+  remove(entity) {
+    this.group.remove(entity.mesh);
+    if (entity.body) this.physics.world.removeRigidBody(entity.body);
+    if (entity.unique) { entity.mesh.geometry?.dispose(); entity.mesh.material?.dispose(); }
+    if (entity.texture) { entity.mesh.material.dispose(); entity.texture.dispose(); }
+  }
+
+  dispose(racers) { this.reset(racers); this.scene.remove(this.group); }
+
+  restoreCar(racer) {
+    if (racer.mesh.userData.bombFuse) {
+      racer.mesh.remove(racer.mesh.userData.bombFuse);
+      delete racer.mesh.userData.bombFuse;
+    }
+    racer.mesh.traverse((o) => { if (o.material && o.userData.powerupColor) o.material.color.copy(o.userData.powerupColor); });
+  }
+
+  forward(racer) { return new THREE.Vector3(0, 0, 1).applyQuaternion(racer.mesh.quaternion).normalize(); }
+
+  flash(position, color = 0xffb326, radius = 12) {
+    const texture = this.assets.explosions.clone();
+    texture.repeat.set(0.125, 0.125); texture.offset.set(0, 0.75); texture.needsUpdate = true;
+    const mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    mesh.position.copy(position); mesh.scale.setScalar(radius);
+    this.group.add(mesh); this.effects.push({ mesh, life: 0.5, radius, texture });
+  }
+
+  bolt(from, to) {
+    const points = Array.from({ length: 9 }, (_, i) => {
+      const point = from.clone().lerp(to, i / 8).add(new THREE.Vector3(0, 2, 0));
+      if (i > 0 && i < 8) point.add(new THREE.Vector3(Math.sin(i * 7 + this.time * 20) * 1.4, Math.cos(i * 9) * 1.4, 0));
+      return point;
+    });
+    const mesh = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0x75ddff, transparent: true, blending: THREE.AdditiveBlending }));
+    this.group.add(mesh); this.effects.push({ mesh, life: 0.16, bolt: true, unique: true });
+  }
+
+  explode(position, racers, owner = null, radius = 20) {
+    this.flash(position); this.playSound("firebang", position);
+    for (const racer of racers) {
+      const distance = racer.position.distanceTo(position);
+      if (distance > radius || (owner === racer && distance > 6)) continue;
+      const direction = racer.position.clone().sub(position); direction.y = 0;
+      if (direction.lengthSq() < 0.01) direction.set(1, 0, 0);
+      direction.normalize().multiplyScalar(120 * (1 - distance / radius)); direction.y = 150;
+      racer.car.body.applyImpulse(direction, true);
+      racer.car.body.applyTorqueImpulse({ x: 70, y: 20, z: 50 }, true);
+    }
+  }
+
+  spawnProjectile(racer, kind) {
+    const forward = this.forward(racer);
+    const mesh = kind === "shockwave" ? new THREE.Mesh(new THREE.SphereGeometry(2, 12, 8), new THREE.MeshBasicMaterial({ color: 0x54cfff, wireframe: true })) : this.assets.models[kind === "balloons" ? "wbomb" : "firework"].clone(true);
+    if (kind === "balloons") mesh.scale.setScalar(0.4);
+    mesh.position.copy(racer.position).addScaledVector(forward, 12); mesh.position.y += 3;
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward);
+    this.group.add(mesh);
+    const projectileSpeed = kind === "balloons" ? 45 : 105;
+    const entity = { mesh, owner: racer, kind, velocity: forward.multiplyScalar(projectileSpeed).add(racer.velocity), life: kind === "shockwave" ? 10 : 5, unique: kind === "shockwave", bounces: 0, previousVy: 18, hitCars: new Set() };
+    if (kind === "balloons") {
+      entity.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(...mesh.position.toArray()).setLinvel(entity.velocity.x, 18, entity.velocity.z).setCcdEnabled(true));
+      this.physics.world.createCollider(RAPIER.ColliderDesc.ball(0.8).setRestitution(0.65).setMass(0.2), entity.body);
+    }
+    this.projectiles.push(entity);
+  }
+
+  dropHazard(racer, kind) {
+    const position = racer.position.clone().addScaledVector(this.forward(racer), -14);
+    const floor = this.physics.groundAt(position, 5, 40);
+    if (floor === null) return;
+    position.y = floor + 0.08;
+    let mesh;
+    if (kind === "clone") mesh = this.assets.models.pickup.clone(true);
+    else if (kind === "bearing") { mesh = this.assets.models.ball.clone(true); mesh.scale.setScalar(0.35); position.y += 3.5; }
+    else { mesh = new THREE.Mesh(new THREE.CircleGeometry(8, 24), new THREE.MeshBasicMaterial({ color: 0x121017, transparent: true, opacity: 0.85, depthWrite: false })); mesh.rotation.x = -Math.PI / 2; }
+    mesh.position.copy(position); this.group.add(mesh);
+    if (kind === "clone") mesh.position.y += 4;
+    const hazard = { kind, mesh, owner: racer, life: 30, armed: 0.7, unique: kind === "oil" };
+    if (kind === "bearing") {
+      hazard.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(...position.toArray()).setLinvel(racer.velocity.x * 0.6, 0, racer.velocity.z * 0.6).setCcdEnabled(true));
+      this.physics.world.createCollider(RAPIER.ColliderDesc.ball(3.5).setMass(40).setFriction(0.8).setRestitution(0.2), hazard.body);
+    }
+    this.hazards.push(hazard);
+  }
+
+  fire(racer, racers) {
+    const state = racer.powerups;
+    if (!state?.held || state.rolling > 0 || state.cooldown > 0 || racer.finished) return false;
+    const powerup = state.held;
+    state.cooldown = 0.35;
+    this.playSound(powerup.sound, racer.position);
+    if (["shockwave", "firework", "fireworks", "balloons"].includes(powerup.id)) this.spawnProjectile(racer, powerup.id === "fireworks" ? "firework" : powerup.id);
+    else if (["oil", "bearing", "clone"].includes(powerup.id)) this.dropHazard(racer, powerup.id);
+    else if (powerup.id === "battery") { state.boost = 8; state.disabled = 0; }
+    else if (powerup.id === "electro") state.electro = 8;
+    else if (powerup.id === "star") {
+      for (const other of racers) if (other !== racer) other.powerups.disabled = 4;
+      this.flash(racer.position, 0x70ddff, 30);
+    }
+    if (--state.shots <= 0) { state.held = null; state.shots = 0; }
+    return true;
+  }
+
+  debugGive(racer, id) {
+    const powerup = POWERUPS.find((item) => item.id === id);
+    if (!powerup) return false;
+    this.restoreCar(racer);
+    racer.powerups = createPowerState();
+    awardPowerup(racer.powerups, powerup, false);
+    return true;
+  }
+
+  debugClear(racer) {
+    this.restoreCar(racer);
+    racer.powerups = createPowerState();
+    for (const collection of ["projectiles", "hazards"]) this[collection] = this[collection].filter((entity) => {
+      if (entity.owner !== racer) return true;
+      this.remove(entity); return false;
+    });
+  }
+
+  collect(racer, pickup, racers) {
+    const sorted = [...racers].sort((a, b) => b.placeScore - a.placeScore);
+    const powerup = pickup.star ? POWERUPS.at(-1) : choosePowerup(sorted.indexOf(racer) + 1, racers.length, !racer.isPlayer);
+    if (!awardPowerup(racer.powerups, powerup)) return false;
+    pickup.active = false; pickup.respawn = 8; pickup.mesh.visible = false;
+    if (racer.isPlayer) this.playSound("pickup", racer.position);
+    return true;
+  }
+
+  update(dt, racers) {
+    this.time += dt;
+    for (const racer of racers) {
+      const state = racer.powerups ??= createPowerState();
+      for (const key of ["cooldown", "boost", "disabled", "slippery", "electro", "bombLock"]) state[key] = Math.max(0, state[key] - dt);
+      if (state.rolling > 0) {
+        state.rolling = Math.max(0, state.rolling - dt);
+        if (state.rolling === 0 && state.held?.id === "bomb") { state.bomb = 10; state.held = null; state.shots = 0; this.playSound("fuse", racer.position); }
+      }
+      if (state.bomb > 0) {
+        state.bomb = Math.max(0, state.bomb - dt);
+        if (state.bomb === 0) this.explode(racer.position, racers);
+        else if (state.bombLock === 0) {
+          const other = racers.find((other) => other !== racer && other.powerups.bomb === 0 && other.powerups.bombLock === 0 && other.position.distanceTo(racer.position) < 12);
+          if (other) {
+            other.powerups.bomb = state.bomb; other.powerups.bombLock = 1;
+            other.powerups.held = null; other.powerups.shots = 0; other.powerups.rolling = 0;
+            state.bomb = 0; state.bombLock = 1;
+          }
+        }
+      }
+      racer.mesh.traverse((object) => {
+        if (!object.material) return;
+        object.userData.powerupColor ??= object.material.color.clone();
+        object.material.color.copy(object.userData.powerupColor);
+        if (state.bomb > 0) object.material.color.multiplyScalar(0.2);
+        else if (state.disabled > 0 || state.electro > 0) object.material.color.set(0x65caff);
+      });
+      if (state.electro > 0) for (const other of racers) {
+        if (other !== racer && other.position.distanceTo(racer.position) < 35) {
+          other.powerups.disabled = Math.max(other.powerups.disabled, 2);
+          if (Math.floor(this.time * 6) !== Math.floor((this.time - dt) * 6)) this.bolt(racer.position, other.position);
+        }
+      }
+      if (state.bomb > 0) {
+        if (!racer.mesh.userData.bombFuse) {
+          const fuse = this.assets.models.fuse.clone(true);
+          fuse.position.set(0, 5, -2); racer.mesh.add(fuse); racer.mesh.userData.bombFuse = fuse;
+        }
+        racer.mesh.userData.bombFuse.scale.set(1, state.bomb / 10, 1);
+        if (Math.floor(this.time * 5) !== Math.floor((this.time - dt) * 5)) this.flash(racer.position.clone().add(new THREE.Vector3(0, 6, 0)), 0xff9b21, 2);
+      } else if (racer.mesh.userData.bombFuse) this.restoreCar(racer);
+      if (!racer.isPlayer && state.held && state.rolling === 0 && state.cooldown === 0) this.fire(racer, racers);
+    }
+    for (const pickup of this.pickups) {
+      pickup.mesh.rotation.y += dt * 2;
+      pickup.mesh.position.y = pickup.position.y + Math.sin(this.time * 3 + pickup.position.x) * 0.35;
+      if (!pickup.active) {
+        pickup.respawn -= dt;
+        if (pickup.respawn <= 0) { pickup.active = true; pickup.mesh.visible = true; }
+      }
+      if (pickup.active) for (const racer of racers) {
+        if (!racer.finished && racer.position.distanceTo(pickup.position) < 10 && this.collect(racer, pickup, racers)) break;
+      }
+    }
+    this.updateProjectiles(dt, racers);
+    for (const hazard of this.hazards) {
+      hazard.life -= dt; hazard.armed -= dt;
+      if (hazard.body) { hazard.mesh.position.copy(hazard.body.translation()); hazard.mesh.quaternion.copy(hazard.body.rotation()); }
+      if (hazard.kind === "clone") hazard.mesh.rotation.y += dt * 2;
+      if (hazard.armed <= 0 && hazard.kind !== "bearing") for (const racer of racers) {
+        const delta = racer.position.clone().sub(hazard.mesh.position);
+        if (Math.abs(delta.y) < 8 && Math.hypot(delta.x, delta.z) < 10) {
+          if (hazard.kind === "clone") { this.explode(hazard.mesh.position, racers); hazard.life = 0; break; }
+          racer.powerups.slippery = 4;
+        }
+      }
+    }
+    this.hazards = this.hazards.filter((hazard) => { if (hazard.life > 0) return true; this.remove(hazard); return false; });
+    this.effects = this.effects.filter((effect) => {
+      effect.life -= dt;
+      effect.mesh.material.opacity = Math.max(0, effect.life * (effect.bolt ? 6.25 : 2));
+      if (!effect.bolt) effect.mesh.scale.setScalar(effect.radius * (2 - effect.life));
+      if (effect.life > 0) return true;
+      this.remove(effect); return false;
+    });
+  }
+
+  updateProjectiles(dt, racers) {
+    for (const projectile of this.projectiles) {
+      projectile.life -= dt;
+      const previous = projectile.mesh.position.clone();
+      if (projectile.body) {
+        projectile.mesh.position.copy(projectile.body.translation());
+        const vy = projectile.body.linvel().y;
+        if (projectile.previousVy < -1 && vy > 1) projectile.bounces++;
+        projectile.previousVy = vy;
+        if (projectile.bounces > 1) projectile.life = 0;
+      } else {
+        if (projectile.kind === "firework") {
+          const direction = projectile.velocity.clone().normalize();
+          const target = racers.filter((r) => r !== projectile.owner && r.position.clone().sub(previous).normalize().dot(direction) > 0.5).sort((a, b) => a.position.distanceToSquared(previous) - b.position.distanceToSquared(previous))[0];
+          if (target && target.position.distanceTo(previous) < 160) projectile.velocity.lerp(target.position.clone().add(new THREE.Vector3(0, 2, 0)).sub(previous).normalize().multiplyScalar(105), Math.min(1, dt * 1.2));
+        }
+        projectile.mesh.position.addScaledVector(projectile.velocity, dt);
+        projectile.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), projectile.velocity.clone().normalize());
+        const segment = projectile.mesh.position.clone().sub(previous);
+        this.ray.set(previous, segment.clone().normalize()); this.ray.far = segment.length();
+        const hit = this.ray.intersectObject(this.terrain, true)[0];
+        if (hit) { projectile.mesh.position.copy(hit.point); projectile.life = 0; }
+      }
+      const segment = new THREE.Line3(previous, projectile.mesh.position);
+      for (const racer of racers) {
+        if (racer === projectile.owner || projectile.hitCars.has(racer)) continue;
+        const closest = segment.closestPointToPoint(racer.position, true, new THREE.Vector3());
+        if (closest.distanceTo(racer.position) > (projectile.kind === "shockwave" ? 12 : 8)) continue;
+        projectile.hitCars.add(racer);
+        if (projectile.kind === "shockwave") { racer.car.body.applyImpulse({ x: 0, y: 160, z: 0 }, true); racer.car.body.applyTorqueImpulse({ x: 60, y: 10, z: 40 }, true); }
+        else projectile.life = 0;
+      }
+      if (projectile.life <= 0 && projectile.kind === "balloons") {
+        this.flash(projectile.mesh.position, 0x88dfff, 15); this.playSound("wbombhit", projectile.mesh.position);
+        for (const racer of racers) if (racer.position.distanceTo(projectile.mesh.position) < 22) racer.powerups.slippery = 4;
+      } else if (projectile.life <= 0 && projectile.kind === "firework") this.explode(projectile.mesh.position, racers, projectile.owner);
+    }
+    this.projectiles = this.projectiles.filter((projectile) => { if (projectile.life > 0) return true; this.remove(projectile); return false; });
+  }
+
+  drawIcon(canvas, powerup) {
+    const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!powerup) return;
+    const image = this.assets.icons.image, [x, y] = powerup.icon;
+    const pixels = new Uint8ClampedArray(32 * 32 * 4);
+    for (let row = 0; row < 32; row++) pixels.set(image.data.subarray(((y + row) * image.width + x) * 4, ((y + row) * image.width + x + 32) * 4), row * 128);
+    const small = document.createElement("canvas"); small.width = small.height = 32;
+    small.getContext("2d").putImageData(new ImageData(pixels, 32, 32), 0, 0);
+    ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
+  }
+}
+
+    </script>
+    <script type="text/plain" data-game-module="race-ai.js">
+import * as THREE from "three";
+
+export function makeRaceRoute(points) {
+  const curve = new THREE.CurvePath();
+  for (let i = 0; i < points.length; i++) curve.add(new THREE.LineCurve3(points[i], points[(i + 1) % points.length]));
+  return curve;
+}
+
+export function makeAiRoute(path, racingLine) {
+  // POS nodes measure race progress; FAN nodes specify the actual driving line.
+  return racingLine.length >= 3 ? racingLine : path.length >= 3 ? path : [];
+}
+
+export function findAiRecovery(physics, ai, distance) {
+  for (let ahead = 0; ahead <= 300; ahead += 10) {
+    const routeDistance = Math.min(ai.length - 1, distance + ahead);
+    const routePosition = ai.at(routeDistance);
+    for (const radius of [0, 8, 16, 32, 64, 128]) for (let side = 0; side < (radius ? 8 : 1); side++) {
+      const position = routePosition.clone().add(new THREE.Vector3(Math.sin(side * Math.PI / 4) * radius, 0, Math.cos(side * Math.PI / 4) * radius));
+      const floor = physics.groundAt(position, 15, 60);
+      if (floor !== null && Math.abs(floor - position.y) < 40) {
+        position.y = floor + 0.8;
+        const direction = ai.at(routeDistance + 8).sub(ai.at(routeDistance));
+        return { position, distance: routeDistance, heading: Math.atan2(direction.x, direction.z) };
+      }
+    }
+  }
+  return null;
+}
+
+export function trafficSpeedLimit(position, heading, velocity, halfExtents, traffic) {
+  const forward = new THREE.Vector3(Math.sin(heading),0,Math.cos(heading));
+  const side = new THREE.Vector3(forward.z,0,-forward.x);
+  const speed = Math.max(0,velocity.dot(forward));
+  let limit = Infinity;
+  for(const other of traffic) {
+    const delta=other.position.clone().sub(position),size=other.halfExtents;
+    if(Math.abs(delta.y)>halfExtents.y+size.y+2) continue;
+    const ahead=delta.dot(forward);
+    if(ahead<=0||ahead>halfExtents.z+size.z+15+speed*1.2) continue;
+    const angle=(other.heading??heading)-heading;
+    const width=Math.abs(Math.cos(angle))*size.x+Math.abs(Math.sin(angle))*size.z;
+    if(Math.abs(delta.dot(side))>halfExtents.x+width+0.6) continue;
+    const length=Math.abs(Math.cos(angle))*size.z+Math.abs(Math.sin(angle))*size.x;
+    const gap=ahead-halfExtents.z-length;
+    const leadSpeed=Math.max(0,other.velocity.dot(forward));
+    limit=Math.min(limit,Math.max(0,leadSpeed+2*(gap-5-speed*0.18)));
+    if(gap<3) limit=0;
+  }
+  return limit;
+}
+
+export class RaceAI {
+  constructor(points, pace = 0.9, setup = null) {
+    this.points = points;
+    this.pace = pace;
+    const wheels=setup?.wheels??[];
+    this.wheelbase=wheels.length?Math.max(...wheels.map(wheel=>wheel.position.z))-Math.min(...wheels.map(wheel=>wheel.position.z)):8;
+    this.steeringAngle=Math.max(0.1,...wheels.filter(wheel=>wheel.turnable).map(wheel=>wheel.steerRatio));
+    if(!wheels.length) this.steeringAngle=0.45;
+    this.lengths = points.map((point, i) => point.distanceTo(points[(i + 1) % points.length]));
+    this.offsets = [0];
+    this.lengths.forEach((length) => this.offsets.push(this.offsets.at(-1) + length));
+    this.length = this.offsets.at(-1);
+    this.reset();
+  }
+
+  reset() { this.segment = 0; this.distance = 0; this.laps = 0; this.stalled = 0; this.reversing = 0; this.recoveryCount = 0; this.recoveryCooldown = 0; this.trafficWait=0; }
+
+  acceptRecovery(distance) {
+    this.distance = distance;
+    this.segment = this.offsets.findIndex((offset, i) => i < this.points.length && distance < this.offsets[i + 1]);
+    if (this.segment < 0) this.segment = this.points.length - 1;
+  }
+
+  at(distance) {
+    distance = ((distance % this.length) + this.length) % this.length;
+    let segment = this.offsets.findIndex((offset, i) => i < this.points.length && distance < this.offsets[i + 1]);
+    if (segment < 0) segment = 0;
+    const t = (distance - this.offsets[segment]) / Math.max(0.01, this.lengths[segment]);
+    return this.points[segment].clone().lerp(this.points[(segment + 1) % this.points.length], t);
+  }
+
+  update(dt, position, heading, velocity, { disabled = false, upsideDown = false, traffic = [], halfExtents = new THREE.Vector3(3,2,6) } = {}) {
+    if (this.points.length < 3 || this.length < 1) return { throttle: 0, brake: 1, steering: 0 };
+    let segment = this.segment;
+    let line = new THREE.Line3(this.points[segment], this.points[(segment + 1) % this.points.length]);
+    let t = line.closestPointToPointParameter(position, false);
+    const nextLine = new THREE.Line3(this.points[(segment + 1) % this.points.length], this.points[(segment + 2) % this.points.length]);
+    const endpointDistance = position.distanceTo(line.end);
+    if (t >= 1 || (endpointDistance < 10 && nextLine.closestPointToPointParameter(position, false) > 0)) {
+      segment = (segment + 1) % this.points.length;
+      if (segment === 0) this.laps++;
+      this.segment = segment;
+      line = nextLine;
+      t = line.closestPointToPointParameter(position, false);
+    }
+    const previous = this.distance;
+    const projected = this.offsets[segment] + THREE.MathUtils.clamp(t, 0, 1) * this.lengths[segment];
+    this.distance = segment === 0 && previous > this.length * 0.5 ? projected : Math.max(previous, projected);
+    let advance = this.distance - previous;
+    if (advance < -this.length * 0.5) advance += this.length;
+    const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
+    const speed = velocity.dot(forward);
+    const nearest=line.closestPointToPoint(position,true,new THREE.Vector3());
+    const routeError=Math.hypot(position.x-nearest.x,position.z-nearest.z);
+    const trafficLimit = trafficSpeedLimit(position,heading,velocity,halfExtents,traffic);
+    this.recoveryCooldown = Math.max(0, this.recoveryCooldown - dt);
+    if (disabled) { this.stalled = 0; return { throttle: 0, brake: 0, steering: 0 }; }
+    this.stalled = upsideDown || advance < dt * 0.8 || routeError > 35 ? this.stalled + dt : Math.max(0, this.stalled - dt * 2);
+    this.trafficWait=trafficLimit<3&&Math.abs(speed)<4?this.trafficWait+dt:0;
+    if(trafficLimit<3&&!upsideDown&&routeError<20) {
+      if(this.trafficWait<2) this.stalled=0;
+      this.reversing=0;
+    }
+    if ((this.stalled > 6 || (upsideDown && this.stalled > 2)) && this.recoveryCooldown === 0) {
+      const distance = Math.min(this.length - 1, this.distance + 25);
+      const recovery = this.at(distance);
+      const direction = this.at(distance + 8).sub(recovery);
+      this.stalled = 0; this.reversing = 0; this.recoveryCooldown = 3; this.recoveryCount++;this.trafficWait=0;
+      return { throttle: 0, brake: 0, steering: 0, recovery, recoveryDistance: distance, heading: Math.atan2(direction.x, direction.z) };
+    }
+    if (this.stalled > 2 && this.reversing === 0 && trafficLimit>0) this.reversing = 1.2;
+    const lookAhead = THREE.MathUtils.clamp(12 + Math.abs(speed) * 0.35, 15, 35);
+    const target = this.at(this.distance + lookAhead);
+    const delta = target.sub(position); delta.y = 0;
+    const angle = Math.atan2(Math.sin(Math.atan2(delta.x, delta.z) - heading), Math.cos(Math.atan2(delta.x, delta.z) - heading));
+    const steering = THREE.MathUtils.clamp(Math.atan2(2*this.wheelbase * Math.sin(angle), Math.max(8, delta.length())) / this.steeringAngle, -1, 1);
+    if (this.reversing > 0) {
+      this.reversing = Math.max(0, this.reversing - dt);
+      return { throttle: -0.3, brake: 0, steering: -steering };
+    }
+    let desiredSpeed = 185 * this.pace;
+    const stoppingDistance = speed * speed / 28 + 25;
+    // Brake before sharp authored corners, instead of aiming through nearby walls.
+    for (let i = 0; i < this.points.length; i++) {
+      const corner = (segment + i + 1) % this.points.length;
+      let distance = this.offsets[corner] - this.distance;
+      if (distance < 0) distance += this.length;
+      if (distance > stoppingDistance) break;
+      const before = this.points[corner].clone().sub(this.points[(corner - 1 + this.points.length) % this.points.length]); before.y = 0;
+      const after = this.points[(corner + 1) % this.points.length].clone().sub(this.points[corner]); after.y = 0;
+      const turn = before.normalize().angleTo(after.normalize());
+      if (turn > 0.3) {
+        const segmentLength=Math.min(this.lengths[(corner-1+this.points.length)%this.points.length],this.lengths[corner]);
+        const radius=Math.max(5,segmentLength*0.7/(2*Math.sin(turn/2)));
+        const turnLimit=32+118*Math.max(0,1-turn/(Math.PI/2));
+        const cornerSpeed=Math.min(THREE.MathUtils.clamp(Math.sqrt(radius*45),28,150),turnLimit);
+        const approachSpeed = Math.sqrt(cornerSpeed * cornerSpeed + 28 * Math.max(0, distance - 15));
+        desiredSpeed = Math.min(desiredSpeed, approachSpeed);
+      }
+    }
+    if (Math.abs(angle) > 0.65 || routeError > 12) desiredSpeed = Math.min(desiredSpeed, 35);
+    desiredSpeed=Math.min(desiredSpeed,trafficLimit);
+    if(trafficLimit===0) return {throttle:0,brake:1,steering};
+    return { throttle: THREE.MathUtils.clamp(0.15 + (desiredSpeed - speed) * 0.04, 0, 1), brake: THREE.MathUtils.clamp((speed - desiredSpeed) / 15, 0, 1), steering };
+  }
+}
+
+    </script>
+    <script type="text/plain" data-game-module="revolt.js">
+import * as THREE from "three";
+import { gameAssetUrl } from "./assets.js";
+import { computeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
+
+export const RV_SCALE = 0.1;
+
+class Reader {
+  constructor(buffer) { this.view = new DataView(buffer); this.offset = 0; }
+  u16() { const v = this.view.getUint16(this.offset, true); this.offset += 2; return v; }
+  i16() { const v = this.view.getInt16(this.offset, true); this.offset += 2; return v; }
+  i32() { const v = this.view.getInt32(this.offset, true); this.offset += 4; return v; }
+  f32() { const v = this.view.getFloat32(this.offset, true); this.offset += 4; return v; }
+  vec() { return [this.f32(), this.f32(), this.f32()]; }
+}
+
+export function parseMesh(reader, world = false) {
+  if (world) reader.offset += 40;
+  const polygonCount = reader.u16(), vertexCount = reader.u16();
+  const polygons = [];
+  for (let i = 0; i < polygonCount; i++) {
+    const flags = reader.u16(), texture = reader.i16();
+    const indices = Array.from({ length: 4 }, () => reader.u16());
+    const colors = [];
+    for (let j = 0; j < 4; j++) {
+      const o = reader.offset;
+      colors.push([reader.view.getUint8(o + 2), reader.view.getUint8(o + 1), reader.view.getUint8(o), 255 - reader.view.getUint8(o + 3)]);
+      reader.offset += 4;
+    }
+    const uv = Array.from({ length: 4 }, () => [reader.f32(), reader.f32()]);
+    polygons.push({ flags, texture, indices, colors, uv });
+  }
+  const vertices = Array.from({ length: vertexCount }, () => ({ position: reader.vec(), normal: reader.vec() }));
+  for (const p of polygons) {
+    for (const index of p.indices.slice(0, p.flags & 1 ? 4 : 3)) {
+      if (index >= vertexCount) throw new Error("Invalid Re-Volt vertex index");
+    }
+  }
+  return { polygons, vertices };
+}
+
+export function parseWorld(buffer) {
+  const r = new Reader(buffer), count = r.i32();
+  const meshes = Array.from({ length: count }, () => parseMesh(r, true));
+  const cubes = r.i32();
+  for (let i = 0; i < cubes; i++) { r.offset += 16; const count = r.i32(); r.offset += count * 4; }
+  const animations = [];
+  if (r.offset < buffer.byteLength) {
+    const count = r.i32();
+    for (let i = 0; i < count; i++) {
+      const frames = r.i32();
+      animations.push(Array.from({ length: frames }, () => ({ texture: r.i32(), delay: r.f32(), uv: Array.from({ length: 4 }, () => [r.f32(), r.f32()]) })));
+    }
+  }
+  return { meshes, animations };
+}
+
+export function parsePrm(buffer) { return parseMesh(new Reader(buffer)); }
+
+export function parseObjects(buffer, origin = [0, 0, 0]) {
+  const reader = new Reader(buffer);
+  const count = reader.i32();
+  if (count < 0 || buffer.byteLength !== 4 + count * 56) throw new Error("Invalid Re-Volt FOB object file");
+  return Array.from({ length: count }, () => ({
+    type: reader.i32(), flags: Array.from({ length: 4 }, () => reader.i32()),
+    position: new THREE.Vector3(...converted(reader.vec(), origin)),
+    up: reader.vec(), forward: reader.vec(),
+  }));
+}
+
+export function resolveModel(name, files) {
+  const matches = files.filter((p) => p.toLowerCase().split("/").at(-1).startsWith(name) && p.endsWith(".prm"));
+  const exact = matches.find((p) => p.toLowerCase().endsWith(`/${name}.prm`) || p.toLowerCase() === `${name}.prm`);
+  // The original FIN name is limited to eight characters. Match the base model before numbered variants.
+  return exact ?? matches.sort((a, b) => a.length - b.length || a.localeCompare(b))[0];
+}
+
+export function parseInstances(buffer) {
+  const r = new Reader(buffer), count = r.i32();
+  return Array.from({ length: count }, () => {
+    const offset = r.offset;
+    const name = new TextDecoder().decode(new Uint8Array(buffer, offset, 9)).split("\0")[0].toLowerCase();
+    const tint = [9, 10, 11].map((i) => (128 + r.view.getInt8(offset + i)) / 255);
+    const flags = r.view.getUint8(offset + 17);
+    r.offset += 24;
+    return { name, tint, flags, position: r.vec(), matrix: [...r.vec(), ...r.vec(), ...r.vec()] };
+  });
+}
+
+export function parsePositions(buffer) {
+  if (buffer.byteLength < 12) return [];
+  const r = new Reader(buffer), count = r.i32(), start = r.i32();
+  r.f32();
+  const nodes = Array.from({ length: count }, () => ({ position: r.vec(), distance: r.f32(), prev: Array.from({ length: 4 }, () => r.i32()), next: Array.from({ length: 4 }, () => r.i32()) }));
+  const path = [], seen = new Set();
+  let index = start;
+  while (nodes[index] && !seen.has(index)) {
+    seen.add(index); path.push(nodes[index].position);
+    index = nodes[index].next.find((n) => n >= 0);
+  }
+  return path;
+}
+
+export function parseInfo(text) {
+  const info = {};
+  for (const line of text.split(/\r?\n/)) {
+    const tokens = line.split(";")[0].trim().split(/[\s,]+/);
+    if (tokens.length > 1) info[tokens[0].toUpperCase()] = tokens.slice(1).map(Number);
+  }
+  return info;
+}
+
+export function parseAiPositions(buffer, origin = [0, 0, 0]) {
+  if (buffer.byteLength <= 4) return [];
+  const view = new DataView(buffer), count = view.getInt16(0, true);
+  if (count <= 0 || buffer.byteLength !== 12 + count * 76) throw new Error("Invalid stock Re-Volt FAN file");
+  const nodes = Array.from({ length: count }, (_, i) => {
+    const offset = 12 + i * 76;
+    const readVector = (at) => [0, 1, 2].map((axis) => view.getFloat32(at + axis * 4, true));
+    const left = new THREE.Vector3(...converted(readVector(offset + 40), origin));
+    const right = new THREE.Vector3(...converted(readVector(offset + 56), origin));
+    return { position: left.lerp(right, THREE.MathUtils.clamp(view.getFloat32(offset + 4, true), 0, 1)), next: [view.getInt32(offset + 28, true), view.getInt32(offset + 32, true)] };
+  });
+  let start = 0;
+  nodes.forEach((node, i) => { if (node.position.lengthSq() < nodes[start].position.lengthSq()) start = i; });
+  const path = [], seen = new Set();
+  let index = start;
+  while (nodes[index] && !seen.has(index)) {
+    seen.add(index); path.push(nodes[index].position);
+    index = nodes[index].next.find((next) => next >= 0 && next < count);
+  }
+  return path;
+}
+
+function converted(position, origin = [0, 0, 0]) {
+  return [(position[0] - origin[0]) * RV_SCALE, -(position[1] - origin[1]) * RV_SCALE, (position[2] - origin[2]) * RV_SCALE];
+}
+
+export function makeMeshes(meshes, materials, origin, animations = [], tint = [1, 1, 1]) {
+  const buckets = new Map(), color = new THREE.Color();
+  for (const source of meshes) for (const p of source.polygons) {
+    const frame = p.flags & 0x200 ? animations[p.texture]?.[0] : null;
+    const texture = frame?.texture ?? p.texture;
+    const key = `${texture}:${p.flags & 0x106}`;
+    if (!buckets.has(key)) buckets.set(key, { positions: [], colors: [], uv: [], flags: p.flags, texture });
+    const b = buckets.get(key);
+    // The Y reflection converts the original clockwise winding to Three.js winding.
+    const corners = p.flags & 1 ? [0, 1, 2, 0, 2, 3] : [0, 1, 2];
+    for (const c of corners) {
+      const vertex = source.vertices[p.indices[c]];
+      b.positions.push(...converted(vertex.position, origin));
+      const rgba = p.colors[c];
+      color.setRGB(rgba[0] / 255, rgba[1] / 255, rgba[2] / 255, THREE.SRGBColorSpace);
+      b.colors.push(color.r * tint[0], color.g * tint[1], color.b * tint[2], p.flags & 4 ? rgba[3] / 255 : 1);
+      const uv = frame?.uv[c] ?? p.uv[c];
+      b.uv.push(uv[0], 1 - uv[1]);
+    }
+  }
+  const group = new THREE.Group();
+  for (const b of buckets.values()) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(b.positions, 3));
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(b.colors, 4));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(b.uv, 2));
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    computeBoundsTree.call(geometry);
+    const material = new THREE.MeshBasicMaterial({ map: materials[b.texture] ?? null, vertexColors: true, side: b.flags & 2 ? THREE.DoubleSide : THREE.FrontSide, transparent: Boolean(b.flags & 0x104), alphaTest: 0.01, depthWrite: !(b.flags & 0x104), blending: b.flags & 0x100 ? THREE.AdditiveBlending : THREE.NormalBlending });
+    const object = new THREE.Mesh(geometry, material);
+    object.raycast = acceleratedRaycast;
+    group.add(object);
+  }
+  return group;
+}
+
+export function decodeBitmap(buffer) {
+  const v = new DataView(buffer), offset = v.getUint32(10, true), dibSize = v.getUint32(14, true);
+  const width = v.getInt32(18, true), signedHeight = v.getInt32(22, true), height = Math.abs(signedHeight);
+  const bits = v.getUint16(28, true), compression = v.getUint32(30, true);
+  if (![8, 24, 32].includes(bits) || compression !== 0) throw new Error(`Unsupported BMP: ${bits} bits, compression ${compression}`);
+  const stride = Math.ceil(width * bits / 32) * 4, pixels = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const row = signedHeight > 0 ? height - 1 - y : y;
+    let source = offset + row * stride + x * (bits / 8);
+    if (bits === 8) source = 14 + dibSize + v.getUint8(source) * 4;
+    const dest = (y * width + x) * 4;
+    pixels[dest] = v.getUint8(source + 2); pixels[dest + 1] = v.getUint8(source + 1); pixels[dest + 2] = v.getUint8(source);
+    pixels[dest + 3] = pixels[dest] + pixels[dest + 1] + pixels[dest + 2] === 0 ? 0 : 255;
+  }
+  const texture = new THREE.DataTexture(pixels, width, height);
+  texture.colorSpace = THREE.SRGBColorSpace; texture.flipY = true;
+  texture.magFilter = THREE.LinearFilter; texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true; texture.anisotropy = 8; texture.needsUpdate = true;
+  return texture;
+}
+
+async function fetchBuffer(url) {
+  const response = await fetch(gameAssetUrl(url));
+  if (!response.ok) throw new Error(`Could not load ${url} (${response.status})`);
+  return response.arrayBuffer();
+}
+
+export async function loadLevel(level, manifest) {
+  const base = `/levels/${level.id}/${level.id}`;
+  const [worldBuffer, instanceBuffer, positionsBuffer, infoResponse, objectsBuffer, aiBuffer] = await Promise.all([fetchBuffer(`${base}.w`), fetchBuffer(`${base}.fin`), manifest.includes(`${base}.pan`) ? fetchBuffer(`${base}.pan`) : Promise.resolve(new ArrayBuffer(0)), fetch(gameAssetUrl(`${base}.inf`)), fetchBuffer(`${base}.fob`), fetchBuffer(`${base}.fan`)]);
+  const world = parseWorld(worldBuffer), instances = parseInstances(instanceBuffer);
+  const info = parseInfo(await infoResponse.text()), origin = info.STARTPOS ?? [0, 0, 0];
+  const textures = {};
+  const files = manifest.filter((p) => p.startsWith(`/levels/${level.id}/`));
+  await Promise.all(files.filter((p) => p.match(new RegExp(`/${level.id}[a-z]\\.bmp$`, "i"))).map(async (p) => {
+    const page = p.at(-5).toLowerCase().charCodeAt(0) - 97;
+    textures[page] = decodeBitmap(await fetchBuffer(p));
+  }));
+  const group = makeMeshes(world.meshes, textures, origin, world.animations);
+  const models = new Map();
+  const resolved = instances.map((instance) => {
+    const path = resolveModel(instance.name, files);
+    if (!path) throw new Error(`Missing or ambiguous model ${level.id}/${instance.name}`);
+    return { ...instance, path };
+  });
+  await Promise.all([...new Set(resolved.map((i) => i.path))].map(async (p) => models.set(p, parsePrm(await fetchBuffer(p)))));
+  for (const instance of resolved) {
+    if (instance.flags & 2) continue;
+    const model = makeMeshes([models.get(instance.path)], textures, [0, 0, 0], [], instance.flags & 16 ? instance.tint : [1, 1, 1]);
+    const m = instance.matrix, position = converted(instance.position, origin);
+    // FIN stores orientation basis vectors as rows (columns in Three.js).
+    model.matrix.set(m[0], -m[3], m[6], position[0], -m[1], m[4], -m[7], position[1], m[2], -m[5], m[8], position[2], 0, 0, 0, 1);
+    model.matrixAutoUpdate = false;
+    model.name = instance.name;
+    model.userData.noCollision = Boolean(instance.flags & 32);
+    group.add(model);
+  }
+  group.updateMatrixWorld(true);
+  let path = parsePositions(positionsBuffer).map((p) => new THREE.Vector3(...converted(p, origin)));
+  if (path.length > 2) {
+    let nearest = 0;
+    path.forEach((p, i) => { if (p.lengthSq() < path[nearest].lengthSq()) nearest = i; });
+    path = [...path.slice(nearest), ...path.slice(0, nearest)];
+  }
+  return { group, path, aiPath: parseAiPositions(aiBuffer, origin), info, textures, objects: parseObjects(objectsBuffer, origin), stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
+}
+
+export function disposeLevel(level) {
+  if (!level) return;
+  level.group.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+  Object.values(level.textures).forEach((t) => t.dispose());
+}
+
+export async function loadCar(id, name) {
+  const base = `/cars/${id}`;
+  const response = await fetch(gameAssetUrl(`${base}/parameters.txt`));
+  const parameters = (await response.text()).replace(/;[^\r\n]*/g, "");
+  const models = new Map([...parameters.matchAll(/MODEL\s+(\d+)\s+"([^"]+)"/gi)].map((m) => [Number(m[1]), `/${m[2].replaceAll("\\", "/").toLowerCase()}`]));
+  const tpage = parameters.match(/TPAGE\s+"([^"]+)"/i)[1];
+  const texture = decodeBitmap(await fetchBuffer(`/${tpage.replaceAll("\\", "/").toLowerCase()}`));
+  const textures = Object.fromEntries(Array.from({ length: 32 }, (_, i) => [i, texture]));
+  const root = new THREE.Group();
+  root.name = name;
+  root.userData.engineClass = Number(parameters.match(/^\s*Class\s+(\d+)/im)?.[1] ?? 0);
+  const body = parameters.match(/BODY\s*\{([^}]+)\}/i)[1];
+  const bodyNumber = Number(body.match(/ModelNum\s+(\d+)/i)[1]);
+  const bodyMesh = makeMeshes([parsePrm(await fetchBuffer(models.get(bodyNumber)))], textures, [0, 0, 0]);
+  root.add(bodyMesh);
+  const bodyBounds = new THREE.Box3().setFromObject(root);
+  const wheels = [];
+  for (const block of parameters.matchAll(/WHEEL\s+\d+\s*\{([^}]+)\}/gi)) {
+    const number = Number(block[1].match(/ModelNum\s+(\d+)/i)[1]);
+    const offset = block[1].match(/Offset1\s+([^\r\n]+)/i)[1].trim().split(/[\s,]+/).map(Number);
+    const tire = makeMeshes([parsePrm(await fetchBuffer(models.get(number)))], textures, [0, 0, 0]);
+    const wheel = new THREE.Group();
+    wheel.add(tire);
+    wheel.userData.tire = tire;
+    wheel.userData.turnable = /IsTurnable\s+TRUE/i.test(block[1]);
+    wheel.userData.powered = /IsPowered\s+TRUE/i.test(block[1]);
+    wheel.userData.engineRatio = Math.abs(Number(block[1].match(/EngineRatio\s+([-\d.]+)/i)?.[1] ?? 1));
+    wheel.userData.steerRatio = Math.abs(Number(block[1].match(/SteerRatio\s+([-\d.]+)/i)?.[1] ?? 0.45));
+    wheel.position.set(...converted(offset));
+    root.add(wheel); wheels.push(wheel);
+  }
+  const bounds = new THREE.Box3().setFromObject(root);
+  const visual = new THREE.Group();
+  [...root.children].forEach((child) => visual.add(child));
+  visual.position.y = -bounds.min.y - 0.42;
+  root.add(visual);
+  const bodyVertices = [];
+  const vertex = new THREE.Vector3();
+  bodyMesh.traverse((object) => {
+    if (!object.geometry) return;
+    const positions = object.geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) bodyVertices.push(...vertex.fromBufferAttribute(positions, i).add(visual.position).toArray());
+  });
+  root.userData.wheels = wheels;
+  root.userData.physics = {
+    bodyVertices: new Float32Array(bodyVertices),
+    halfExtents: bodyBounds.getSize(new THREE.Vector3()).multiplyScalar(0.5),
+    center: bodyBounds.getCenter(new THREE.Vector3()).add(visual.position),
+    wheels: wheels.map((wheel) => {
+      const size = new THREE.Box3().setFromObject(wheel).getSize(new THREE.Vector3());
+      return { position: wheel.position.clone().add(visual.position), radius: size.y * 0.5, turnable: wheel.userData.turnable, powered: wheel.userData.powered, steerRatio: wheel.userData.steerRatio, engineRatio: wheel.userData.engineRatio };
+    }),
+  };
+  return root;
+}
+
+    </script>
+    <script type="text/plain" data-game-module="showroom.js">
+import * as THREE from "three";
+import { gameAssetUrl } from "./assets.js";
+import { loadLevel, loadCar, parsePrm, makeMeshes } from "./revolt.js";
+import { FRONTEND } from "./levels.js";
+
+export const STOCK_CARS = ["rc", "tc6", "phat", "volken", "beatall", "mouse", "candy", "mite", "r5", "tc1", "mud", "moss", "gencar", "tc5", "tc4", "dino", "adeon", "tc3", "fone", "rotor", "amw", "flag", "sgt", "tc2", "cougar", "toyeca", "sugo", "panga"];
+
+export function carDetails(text, id) {
+  const clean = text.replace(/;[^\r\n]*/g, "");
+  const number = (key) => Number(clean.match(new RegExp(`^\\s*${key}\\s+([-\\d.]+)`, "im"))?.[1] ?? 0);
+  return { id, name: clean.match(/Name\s+"([^"]+)"/i)?.[1] ?? id,
+    engineClass: number("Class"), rating: number("Rating"), speed: number("TopSpeed"),
+    acceleration: number("Acc"), weight: number("Weight"), transmission: number("Trans") };
+}
+
+// Keep the original box geometry and atlas UVs; only its front label is car-specific.
+export function labeledBox(source) {
+  const model = structuredClone(source);
+  model.polygons.forEach((polygon, i) => {
+    polygon.colors = polygon.colors.map(() => [255, 255, 255, 255]);
+    if (i === 0) {
+      polygon.texture = 7;
+      polygon.uv = [[0, 0], [0, 1], [1, 1], [1, 0]];
+    }
+  });
+  return model;
+}
+
+function boxLabel(renderer, car, details, atlas) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512; canvas.height = 416;
+  const ctx = canvas.getContext("2d");
+  const image = atlas.image;
+  const original = document.createElement("canvas");
+  original.width = image.width; original.height = image.height;
+  original.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(image.data), image.width, image.height), 0, 0);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, 512, 416);
+  ctx.drawImage(original, 0, 86, 132, 110, 0, 0, 512, 416);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(145, 64, 365, 336);
+  ctx.fillStyle = "#d32132"; ctx.font = "bold 30px Arial";
+  ctx.fillText(details.name.toUpperCase(), 153, 100, 348);
+
+  const preview = new THREE.Scene();
+  preview.add(car);
+  const bounds = new THREE.Box3().setFromObject(car);
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3()).length();
+  const camera = new THREE.PerspectiveCamera(38, 1.4, 0.1, 200);
+  camera.position.copy(center).add(new THREE.Vector3(size * 0.8, size * 0.65, size * 0.9));
+  camera.lookAt(center);
+  const target = new THREE.WebGLRenderTarget(350, 250);
+  const oldTarget = renderer.getRenderTarget(), oldColor = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
+  renderer.setRenderTarget(target); renderer.setClearColor(0xffffff, 0);
+  renderer.render(preview, camera);
+  const pixels = new Uint8Array(350 * 250 * 4);
+  renderer.readRenderTargetPixels(target, 0, 0, 350, 250, pixels);
+  renderer.setRenderTarget(oldTarget); renderer.setClearColor(oldColor, oldAlpha);
+  const flipped = new Uint8ClampedArray(pixels.length);
+  for (let y = 0; y < 250; y++) flipped.set(pixels.subarray(y * 1400, (y + 1) * 1400), (249 - y) * 1400);
+  const rendered = document.createElement("canvas"); rendered.width = 350; rendered.height = 250;
+  rendered.getContext("2d").putImageData(new ImageData(flipped, 350, 250), 0, 0);
+  ctx.drawImage(rendered, 155, 122);
+  target.dispose();
+  preview.remove(car);
+  car.traverse((o) => { o.geometry?.dispose(); if (o.material) { o.material.map?.dispose(); o.material.dispose(); } });
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+export class Showroom {
+  static async create(renderer, manifest) {
+    const showroom = new Showroom();
+    const loaded = await loadLevel(FRONTEND, manifest);
+    showroom.scene.add(loaded.group);
+    const response = await fetch(gameAssetUrl("/levels/frontend/carbox.m"));
+    const model = labeledBox(parsePrm(await response.arrayBuffer()));
+    showroom.cars = await Promise.all(STOCK_CARS.map(async (id) => carDetails(await (await fetch(gameAssetUrl(`/cars/${id}/parameters.txt`))).text(), id)));
+    // A compact four-tier pile in the original shop, not a generated race environment.
+    for (const [index, details] of showroom.cars.entries()) {
+      const car = await loadCar(details.id, details.name);
+      const label = boxLabel(renderer, car, details, loaded.textures[4]);
+      const box = makeMeshes([model], { ...loaded.textures, 7: label }, [0, 0, 0]);
+      box.scale.setScalar(0.7);
+      box.position.set((index % 7 - 3) * 12.1 + (Math.floor(index / 7) % 2) * 1.3, 4.8 + Math.floor(index / 7) * 9.7, -280);
+      box.userData.home = box.position.clone(); box.userData.carIndex = index;
+      showroom.boxes.push(box); showroom.scene.add(box);
+    }
+    showroom.select(0);
+    return showroom;
+  }
+
+  constructor() {
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x111111);
+    this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 800);
+    this.boxes = []; this.selected = 0; this.ray = new THREE.Raycaster();
+  }
+
+  select(index) {
+    this.selected = (index + this.boxes.length) % this.boxes.length;
+    return this.cars[this.selected];
+  }
+
+  pick(x, y) {
+    this.ray.setFromCamera(new THREE.Vector2(x, y), this.camera);
+    const hit = this.ray.intersectObjects(this.boxes, true)[0];
+    if (!hit) return null;
+    let box = hit.object;
+    while (box && box.userData.carIndex === undefined) box = box.parent;
+    return box ? this.select(box.userData.carIndex) : null;
+  }
+
+  render(renderer, dt, aspect) {
+    this.camera.aspect = aspect; this.camera.updateProjectionMatrix();
+    this.camera.position.set(0, 70, aspect < 1 ? -40 : -170);
+    this.camera.lookAt(aspect < 1 ? 0 : -20, aspect < 1 ? -30 : 25, -280);
+    for (const [i, box] of this.boxes.entries()) {
+      const target = i === this.selected ? new THREE.Vector3(aspect < 1 ? 0 : 25, 32, -233) : box.userData.home;
+      box.position.lerp(target, 1 - Math.exp(-dt * 9));
+      box.scale.setScalar(i === this.selected ? 1.5 : 0.7);
+      box.rotation.y = i === this.selected ? 0.25 : 0;
+    }
+    renderer.render(this.scene, this.camera);
+  }
+}
+
+    </script>
+    <script type="text/plain" data-game-module="skid-marks.js">
+import * as THREE from "three";
+
+export function isSkidding({ speed, lateralSpeed, steer, handbrake, airborne }) {
+  return !airborne && Math.abs(speed) > 8 && (Math.abs(lateralSpeed) > 3 || (handbrake && Math.abs(steer) > 0.25));
+}
+
+export class SkidMarks {
+  constructor(scene, capacity = 2048) {
+    this.scene = scene; this.capacity = capacity; this.count = 0; this.next = 0;
+    this.previous = new Map(); this.ages = new Float32Array(capacity).fill(40);
+    this.positions = new Float32Array(capacity * 18);
+    this.colors = new Float32Array(capacity * 24);
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setAttribute("position", new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geometry.setAttribute("color", new THREE.BufferAttribute(this.colors, 4).setUsage(THREE.DynamicDrawUsage));
+    this.geometry.setDrawRange(0, 0);
+    this.material = new THREE.MeshBasicMaterial({ color: 0x141414, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.name = "Tire skid marks"; this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  segment(from, to, normal, width) {
+    const direction = to.clone().sub(from);
+    const distance = direction.length();
+    if (distance < 0.15 || distance > 8) return false;
+    const side = new THREE.Vector3().crossVectors(normal, direction).normalize().multiplyScalar(width / 2);
+    const lift = normal.clone().multiplyScalar(0.025);
+    const corners = [from.clone().add(side).add(lift), from.clone().sub(side).add(lift), to.clone().sub(side).add(lift), to.clone().add(side).add(lift)];
+    const slot = this.next; this.next = (slot + 1) % this.capacity;
+    [0,1,2,0,2,3].forEach((corner, i) => {
+      corners[corner].toArray(this.positions, slot * 18 + i * 3);
+      this.colors.set([1,1,1,0.6], slot * 24 + i * 4);
+    });
+    this.ages[slot] = 0; this.count = Math.min(this.capacity, this.count + 1);
+    this.geometry.setDrawRange(0, this.count * 6);
+    this.geometry.attributes.position.needsUpdate = true; this.geometry.attributes.color.needsUpdate = true;
+    return true;
+  }
+
+  track(racer) {
+    if (!racer.sliding || racer.finished) { this.previous.delete(racer); return; }
+    const previous = this.previous.get(racer) ?? [];
+    const vehicle = racer.car.vehicle;
+    for (let i = 0; i < vehicle.numWheels(); i++) {
+      const contact = vehicle.wheelIsInContact(i) && vehicle.wheelContactPoint(i);
+      const contactNormal = vehicle.wheelContactNormal(i);
+      if (!contact || !contactNormal || contactNormal.y < 0.15) { previous[i] = null; continue; }
+      const point = new THREE.Vector3().copy(contact), normal = new THREE.Vector3().copy(contactNormal).normalize();
+      if (!previous[i]) previous[i] = point;
+      else if (point.distanceTo(previous[i]) > 8) previous[i] = point;
+      else if (this.segment(previous[i], point, normal, Math.max(0.25, racer.car.setup.wheels[i].radius * 0.45))) previous[i] = point;
+    }
+    this.previous.set(racer, previous);
+  }
+
+  update(dt) {
+    for (let slot = 0; slot < this.count; slot++) {
+      this.ages[slot] += dt;
+      const alpha = 0.6 * THREE.MathUtils.clamp((40 - this.ages[slot]) / 20, 0, 1);
+      for (let i = 0; i < 6; i++) this.colors[slot * 24 + i * 4 + 3] = alpha;
+    }
+    this.geometry.attributes.color.needsUpdate = true;
+  }
+
+  clear() { this.count = 0; this.next = 0; this.previous.clear(); this.geometry.setDrawRange(0, 0); this.ages.fill(40); }
+  dispose() { this.scene.remove(this.mesh); this.geometry.dispose(); this.material.dispose(); this.previous.clear(); }
+}
+
+    </script>
+    <script type="text/plain" data-game-module="touch-controls.js">
+export function bindTouchButton(button, code, pointers, enabled) {
+  function release(event) {
+    pointers.delete(event.pointerId);
+    button.classList.toggle("is-pressed", [...pointers.values()].includes(code));
+  }
+  button.addEventListener("pointerdown", (event) => {
+    if (!enabled() || (event.pointerType === "mouse" && event.button !== 0)) return;
+    event.preventDefault();
+    button.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, code);
+    button.classList.add("is-pressed");
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) button.addEventListener(type, release);
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+}
+
+export function createTouchControls({ enabled }) {
+  const controls = document.createElement("div");
+  controls.className = "touch-controls hud";
+  controls.setAttribute("role", "group");
+  controls.setAttribute("aria-label", "Touch driving controls");
+  const pointers = new Map();
+  const groups = [
+    [["KeyA", "◀", "Steer left"], ["KeyD", "▶", "Steer right"]],
+    [["Space", "Slide", "Handbrake"], ["KeyS", "Brake", "Brake or reverse"], ["KeyW", "Gas", "Accelerate"]],
+  ];
+  for (const actions of groups) {
+    const group = document.createElement("div");
+    group.className = "touch-control-group";
+    for (const [code, label, name] of actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.setAttribute("aria-label", name);
+      button.dataset.code = code;
+      group.append(button);
+      bindTouchButton(button, code, pointers, enabled);
+    }
+    controls.append(group);
+  }
+  document.querySelector("#game").append(controls);
+  function clear() {
+    pointers.clear();
+    for (const button of controls.querySelectorAll("button")) button.classList.remove("is-pressed");
+  }
+  window.addEventListener("blur", clear);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) clear(); });
+  return { pressed: (code) => [...pointers.values()].includes(code), clear };
+}
+
+    </script>
+    <script type="module">
+      // Build browser module URLs from the readable game code embedded above.
+      // No npm install, bundler, or compilation is required.
+      const sources = new Map([...document.querySelectorAll("[data-game-module]")].map(
+        (element) => [element.dataset.gameModule, element.textContent]
+      ));
+      const urls = new Map();
+      const visiting = new Set();
+      function moduleUrl(name) {
+        if (urls.has(name)) return urls.get(name);
+        if (visiting.has(name)) throw new Error("Circular game module: " + name);
+        if (!sources.has(name)) throw new Error("Missing game module: " + name);
+        visiting.add(name);
+        const source = sources.get(name).replace(
+          /\bfrom\s+(["'])\.\/([^"']+)\1/g,
+          (match, quote, dependency) => "from " + JSON.stringify(moduleUrl(dependency))
+        );
+        const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+        urls.set(name, url);
+        visiting.delete(name);
+        return url;
+      }
+      try {
+        await import(moduleUrl("main.js"));
+      } catch (error) {
+        console.error(error);
+        document.querySelector("#startDescription").textContent = "Could not start game: " + error.message;
+        document.querySelector("#startBtn").disabled = true;
+      }
+    </script>
   </body>
 </html>
