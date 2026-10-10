@@ -14,11 +14,13 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     const failure = await page.locator("#startDescription").textContent();
     if (failure?.startsWith("Could not start game:")) throw new Error(failure);
     console.log(name, "mobile showroom loaded");
+    await page.locator("#carSelect").selectOption({ label: "Cougar" });
+    await page.waitForFunction(() => document.querySelector("#scene")?.dataset.selectedCar === "cougar");
     await page.locator("#menuTrack").selectOption("ship1");
     await page.waitForFunction(() => window.revoltMap?.id === "ship1" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
     await page.locator("#startBtn").tap();
     await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
-    console.log(name, "mobile race started");
+    console.log(name, "mobile Cougar race started");
     if (!await page.locator('.touch-controls button[data-code="KeyW"]').isVisible()) throw new Error("Gas button is hidden");
     console.log(name, "touch gas button visible");
     if (await page.locator('.touch-controls button[data-code="Space"]').count()) throw new Error("Slide button should be removed");

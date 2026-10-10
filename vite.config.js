@@ -25,7 +25,7 @@ function copyGameAssets() {
 export default defineConfig({
   base: process.env.GITHUB_PAGES === "true" ? "/revolt-clone/" : "/",
   define: {
-    __REVOLT_FILES__: JSON.stringify(readdirSync("levels", { recursive: true }).filter((p) => /\.(prm|bmp|pan)$/i.test(p)).map((p) => `/levels/${p.replaceAll("\\", "/")}`)),
+    __REVOLT_FILES__: JSON.stringify(readdirSync("levels", { recursive: true }).filter((p) => /\.(prm|bmp|pan|ncp)$/i.test(p)).map((p) => `/levels/${p.replaceAll("\\", "/")}`)),
   },
   plugins: [copyGameAssets()],
 });

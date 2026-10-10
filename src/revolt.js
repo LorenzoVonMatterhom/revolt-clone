@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { collisionMesh } from "./collision-mesh.js";
 import { PoolWater } from "./pool-water.js";
 import { FlexibleAntenna } from "./car-effects.js";
 import { gameAssetUrl } from "./assets.js";
@@ -213,6 +214,12 @@ export async function loadLevel(level, manifest) {
     textures[page] = decodeBitmap(await fetchBuffer(p));
   }));
   const group = makeMeshes(world.meshes, textures, origin, world.animations);
+  const collisionGroup = new THREE.Group();
+  collisionGroup.name = "Original track collision";
+  collisionGroup.visible = false;
+  collisionGroup.add(collisionMesh(await fetchBuffer(`${base}.ncp`), origin));
+  group.userData.collisionGroup = collisionGroup;
+  group.add(collisionGroup);
   const models = new Map();
   const resolved = instances.map((instance) => {
     const path = resolveModel(instance.name, files);
@@ -220,6 +227,8 @@ export async function loadLevel(level, manifest) {
     return { ...instance, path };
   });
   await Promise.all([...new Set(resolved.map((i) => i.path))].map(async (p) => models.set(p, parsePrm(await fetchBuffer(p)))));
+  const collisionModels = new Map();
+  await Promise.all([...new Set(resolved.filter(i => !(i.flags & (2 | 32))).map(i => i.path.replace(/\.prm$/i, ".ncp")))].filter(p => files.includes(p)).map(async p => collisionModels.set(p, await fetchBuffer(p))));
   for (const instance of resolved) {
     if (instance.flags & 2) continue;
     const model = makeMeshes([models.get(instance.path)], textures, [0, 0, 0], [], instance.flags & 16 ? instance.tint : [1, 1, 1]);
@@ -230,6 +239,14 @@ export async function loadLevel(level, manifest) {
     model.name = instance.name;
     model.userData.noCollision = Boolean(instance.flags & 32);
     group.add(model);
+    const collisionBuffer = collisionModels.get(instance.path.replace(/\.prm$/i, ".ncp"));
+    if (!(instance.flags & 32) && collisionBuffer?.byteLength) {
+      const solid = collisionMesh(collisionBuffer);
+      solid.matrix.copy(model.matrix);
+      solid.matrixAutoUpdate = false;
+      solid.name = instance.name;
+      collisionGroup.add(solid);
+    }
   }
   const objects = parseObjects(objectsBuffer, origin);
   const water = objects.some(object => object.type === 68)

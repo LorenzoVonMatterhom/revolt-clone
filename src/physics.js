@@ -12,6 +12,7 @@ export function initializePhysics() {
 }
 
 export function meshTriangles(group) {
+  group = group.userData.collisionGroup ?? group;
   group.updateMatrixWorld(true);
   const meshes = [];
   group.traverse((object) => {
