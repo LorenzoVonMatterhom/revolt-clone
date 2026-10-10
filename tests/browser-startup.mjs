@@ -3,6 +3,8 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
   const browser = await engine.launch(name === "Chrome" ? { args: ["--enable-webgl", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] } : {});
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const shaderErrors = [];
+    page.on("console", message => { if (/shader error|VALIDATE_STATUS|ERROR: 0:/i.test(message.text())) shaderErrors.push(message.text()); });
     page.on("pageerror", error => console.log(name, "PAGE ERROR:", error.message));
     page.on("console", message => { if (message.type() === "error") console.log(name, "CONSOLE ERROR:", message.text()); });
     page.on("requestfailed", request => console.log(name, "REQUEST FAILED:", request.url(), request.failure()?.errorText));
@@ -35,6 +37,16 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await fire.tap();
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held !== "firework");
     console.log(name, "Fire button used a power-up; Slide is removed");
+    await page.evaluate(() => {
+      const select = document.querySelector("#debugPowerup");
+      select.value = "electro"; select.dispatchEvent(new Event("change", { bubbles:true }));
+    });
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held === "electro");
+    await fire.tap();
+    await page.waitForFunction(() => document.querySelector("#powerStatus").textContent.startsWith("Pulse:"));
+    await page.waitForTimeout(300);
+    if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
+    console.log(name, "Electro pulse rendered without shader errors");
     await page.locator("#menuBtn").tap();
     await page.locator("#menuTrack").selectOption("ship2");
     await page.waitForFunction(() => window.revoltMap?.id === "ship2" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });

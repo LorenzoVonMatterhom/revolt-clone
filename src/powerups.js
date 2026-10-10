@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createElectricPulse, disposeElectricPulse } from "./electric-pulse.js";
 import { gameAssetUrl } from "./assets.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { parsePrm, makeMeshes, decodeBitmap } from "./revolt.js";
@@ -80,11 +81,19 @@ export class PowerupSystem {
   dispose(racers) { this.reset(racers); this.scene.remove(this.group); }
 
   restoreCar(racer) {
+    disposeElectricPulse(racer.mesh);
     if (racer.mesh.userData.bombFuse) {
       racer.mesh.remove(racer.mesh.userData.bombFuse);
       delete racer.mesh.userData.bombFuse;
     }
-    racer.mesh.traverse((o) => { if (o.material && o.userData.powerupColor) o.material.color.copy(o.userData.powerupColor); });
+    racer.mesh.traverse((o) => { if (o.material?.color && o.userData.powerupColor) o.material.color.copy(o.userData.powerupColor); });
+  }
+
+  updateElectricPulse(racer) {
+    if (racer.powerups.electro <= 0) { disposeElectricPulse(racer.mesh); return; }
+    const shell = racer.mesh.userData.electricPulse ??= createElectricPulse(racer.mesh);
+    shell.material.uniforms.time.value = this.time;
+    shell.material.uniforms.strength.value = Math.min(1, racer.powerups.electro * 4);
   }
 
   forward(racer) { return new THREE.Vector3(0, 0, 1).applyQuaternion(racer.mesh.quaternion).normalize(); }
@@ -165,7 +174,7 @@ export class PowerupSystem {
     if (["shockwave", "firework", "fireworks", "balloons"].includes(powerup.id)) this.spawnProjectile(racer, powerup.id === "fireworks" ? "firework" : powerup.id);
     else if (["oil", "bearing", "clone"].includes(powerup.id)) this.dropHazard(racer, powerup.id);
     else if (powerup.id === "battery") { state.boost = 8; state.disabled = 0; }
-    else if (powerup.id === "electro") state.electro = 8;
+    else if (powerup.id === "electro") { state.electro = 8; this.updateElectricPulse(racer); }
     else if (powerup.id === "star") {
       for (const other of racers) if (other !== racer) other.powerups.disabled = 4;
       this.flash(racer.position, 0x70ddff, 30);
@@ -223,12 +232,13 @@ export class PowerupSystem {
         }
       }
       racer.mesh.traverse((object) => {
-        if (!object.material) return;
+        if (!object.material?.color) return;
         object.userData.powerupColor ??= object.material.color.clone();
         object.material.color.copy(object.userData.powerupColor);
         if (state.bomb > 0) object.material.color.multiplyScalar(0.2);
         else if (state.disabled > 0 || state.electro > 0) object.material.color.set(0x65caff);
       });
+      this.updateElectricPulse(racer);
       if (state.electro > 0) for (const other of racers) {
         if (other !== racer && other.position.distanceTo(racer.position) < 35) {
           other.powerups.disabled = Math.max(other.powerups.disabled, 2);
