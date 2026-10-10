@@ -18,8 +18,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm install --no-save playwright
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - name: Check showroom and race startup
         run: |
           python3 -m http.server 8000 > /tmp/game-server.log 2>&1 &
-          node tests/browser-startup.mjs
+          GAME_TEST_URL=https://lorenzovonmatterhom.github.io/revolt-clone/ node tests/browser-startup.mjs
