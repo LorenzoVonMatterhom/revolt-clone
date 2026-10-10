@@ -693,6 +693,7 @@ function animate() {
     throttle: racer.finished ? 0 : racer.throttle,
     airborne: racer.airborne,
   });
+  for (const racer of racers) racer.mesh.userData.antenna?.update(dt);
   updateCamera(dt);
   updateHud();
   drawMinimap();
