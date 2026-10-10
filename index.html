@@ -2485,7 +2485,12 @@ export class PoolWater {
         if (amount > submerged) { submerged = amount; activeVolume = volume; }
       }
       fraction += submerged / 4;
-      if (submerged > 0) car.body.applyImpulseAtPoint({ x: 0, y: mass * 42 * 1.18 * submerged * dt / 4, z: 0 }, point, true);
+      // Sample the underside, but apply lift at the chassis center plane.
+      // Applying full-submersion lift below the center of mass tips the car over.
+      const liftPoint = new THREE.Vector3(car.setup.center.x + size.x * x,
+        car.setup.center.y, car.setup.center.z + size.z * z)
+        .applyQuaternion(rotation).add(position);
+      if (submerged > 0) car.body.applyImpulseAtPoint({ x: 0, y: mass * 42 * 1.18 * submerged * dt / 4, z: 0 }, liftPoint, true);
     }
     const previous = car.waterFraction ?? 0;
     car.waterFraction = fraction;
