@@ -1,9 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { STOCK_CARS, carDetails, labeledBox } from "../src/showroom.js";
 import { LEVELS, FRONTEND } from "../src/levels.js";
-import { parsePrm, loadCar } from "../src/revolt.js";
+import { parsePrm, loadCar, loadLevel, disposeLevel } from "../src/revolt.js";
+
+test("showroom geometry loads without downloading race collision files", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async url => {
+    requests.push(String(url));
+    return new Response(readFileSync(String(url).slice(1)));
+  };
+  let level;
+  try {
+    const manifest = readdirSync("levels", {recursive:true}).map(p=>"/levels/"+p.replaceAll("\\","/"));
+    level = await loadLevel(FRONTEND, manifest, { collisions: false });
+    assert.ok(level.group.children.length > 0);
+    assert.equal(level.group.userData.collisionGroup, undefined);
+    assert.ok(!requests.some(path=>path.endsWith(".ncp")));
+  } finally { globalThis.fetch=originalFetch; disposeLevel(level); }
+});
 
 test("frontend is a menu asset, not a playable track", () => {
   assert.equal(FRONTEND.kind, "menu");

@@ -2795,7 +2795,7 @@ async function fetchBuffer(url) {
   return response.arrayBuffer();
 }
 
-export async function loadLevel(level, manifest) {
+export async function loadLevel(level, manifest, { collisions = true } = {}) {
   const base = `/levels/${level.id}/${level.id}`;
   const [worldBuffer, instanceBuffer, positionsBuffer, infoResponse, objectsBuffer, aiBuffer] = await Promise.all([fetchBuffer(`${base}.w`), fetchBuffer(`${base}.fin`), manifest.includes(`${base}.pan`) ? fetchBuffer(`${base}.pan`) : Promise.resolve(new ArrayBuffer(0)), fetch(gameAssetUrl(`${base}.inf`)), fetchBuffer(`${base}.fob`), fetchBuffer(`${base}.fan`)]);
   const world = parseWorld(worldBuffer), instances = parseInstances(instanceBuffer);
@@ -2810,9 +2810,11 @@ export async function loadLevel(level, manifest) {
   const collisionGroup = new THREE.Group();
   collisionGroup.name = "Original track collision";
   collisionGroup.visible = false;
-  collisionGroup.add(collisionMesh(await fetchBuffer(`${base}.ncp`), origin));
-  group.userData.collisionGroup = collisionGroup;
-  group.add(collisionGroup);
+  if (collisions) {
+    collisionGroup.add(collisionMesh(await fetchBuffer(`${base}.ncp`), origin));
+    group.userData.collisionGroup = collisionGroup;
+    group.add(collisionGroup);
+  }
   const models = new Map();
   const resolved = instances.map((instance) => {
     const path = resolveModel(instance.name, files);
@@ -2821,7 +2823,7 @@ export async function loadLevel(level, manifest) {
   });
   await Promise.all([...new Set(resolved.map((i) => i.path))].map(async (p) => models.set(p, parsePrm(await fetchBuffer(p)))));
   const collisionModels = new Map();
-  await Promise.all([...new Set(resolved.filter(i => !(i.flags & (2 | 32))).map(i => i.path.replace(/\.prm$/i, ".ncp")))].filter(p => files.includes(p)).map(async p => collisionModels.set(p, await fetchBuffer(p))));
+  if (collisions) await Promise.all([...new Set(resolved.filter(i => !(i.flags & (2 | 32))).map(i => i.path.replace(/\.prm$/i, ".ncp")))].filter(p => files.includes(p)).map(async p => collisionModels.set(p, await fetchBuffer(p))));
   for (const instance of resolved) {
     if (instance.flags & 2) continue;
     const model = makeMeshes([models.get(instance.path)], textures, [0, 0, 0], [], instance.flags & 16 ? instance.tint : [1, 1, 1]);
@@ -3037,15 +3039,16 @@ function boxLabel(renderer, car, details, atlas) {
 export class Showroom {
   static async create(renderer, manifest) {
     const showroom = new Showroom();
-    const loaded = await loadLevel(FRONTEND, manifest);
+    const loaded = await loadLevel(FRONTEND, manifest, { collisions: false });
     showroom.scene.add(loaded.group);
     const response = await fetch(gameAssetUrl("/levels/frontend/carbox.m"));
     const model = labeledBox(parsePrm(await response.arrayBuffer()));
     showroom.cars = await Promise.all(STOCK_CARS.map(async (id) => carDetails(await (await fetch(gameAssetUrl(`/cars/${id}/parameters.txt`))).text(), id)));
     // Four curved shelves in the original shop corner shown in the reference.
     addBoxShelves(showroom.scene);
+    const previews = await Promise.all(showroom.cars.map(details => loadCar(details.id, details.name)));
     for (const [index, details] of showroom.cars.entries()) {
-      const car = await loadCar(details.id, details.name);
+      const car = previews[index];
       const label = boxLabel(renderer, car, details, loaded.textures[4]);
       const box = makeMeshes([model], { ...loaded.textures, 7: label }, [0, 0, 0]);
       const pose = boxShelfPose(index);
@@ -3099,7 +3102,7 @@ export class Showroom {
   }
 }
 
-    </script>
+</script>
     <script type="text/plain" data-game-module="skid-marks.js">
 import * as THREE from "three";
 

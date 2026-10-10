@@ -105,15 +105,16 @@ function boxLabel(renderer, car, details, atlas) {
 export class Showroom {
   static async create(renderer, manifest) {
     const showroom = new Showroom();
-    const loaded = await loadLevel(FRONTEND, manifest);
+    const loaded = await loadLevel(FRONTEND, manifest, { collisions: false });
     showroom.scene.add(loaded.group);
     const response = await fetch(gameAssetUrl("/levels/frontend/carbox.m"));
     const model = labeledBox(parsePrm(await response.arrayBuffer()));
     showroom.cars = await Promise.all(STOCK_CARS.map(async (id) => carDetails(await (await fetch(gameAssetUrl(`/cars/${id}/parameters.txt`))).text(), id)));
     // Four curved shelves in the original shop corner shown in the reference.
     addBoxShelves(showroom.scene);
+    const previews = await Promise.all(showroom.cars.map(details => loadCar(details.id, details.name)));
     for (const [index, details] of showroom.cars.entries()) {
-      const car = await loadCar(details.id, details.name);
+      const car = previews[index];
       const label = boxLabel(renderer, car, details, loaded.textures[4]);
       const box = makeMeshes([model], { ...loaded.textures, 7: label }, [0, 0, 0]);
       const pose = boxShelfPose(index);
