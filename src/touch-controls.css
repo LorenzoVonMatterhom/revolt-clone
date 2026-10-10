@@ -15,6 +15,12 @@
   }
   .touch-controls button[data-code="KeyW"] { background: rgba(52, 120, 55, 0.85); }
   .touch-controls button.is-pressed { background: #f1c94b; color: #101010; border-color: #fff; }
+  .touch-pedals { display: grid; grid-template-columns: repeat(3, auto); }
+  .touch-controls .touch-fire {
+    grid-column: 1 / -1; width: 100%; height: 48px;
+    background: #b3312c; border-color: #ef746d; font-size: 16px;
+  }
+  .touch-controls .touch-fire:disabled { opacity: 0.55; }
   .hud-top { top: max(8px, env(safe-area-inset-top)); left: 12px; right: 12px; flex-direction: row; }
   .brand, .help, .debug-panel { display: none; }
   .readouts { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
