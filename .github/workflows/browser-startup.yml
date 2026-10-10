@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
     paths: [".github/workflows/browser-startup.yml", "tests/browser-startup.mjs"]
+  pull_request:
+    branches: [main]
+    paths: ["index.html", "src/**", ".github/workflows/browser-startup.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,4 +25,4 @@ jobs:
       - name: Check showroom and race startup
         run: |
           python3 -m http.server 8000 > /tmp/game-server.log 2>&1 &
-          GAME_TEST_URL=https://lorenzovonmatterhom.github.io/revolt-clone/ node tests/browser-startup.mjs
+          GAME_TEST_URL=${{ github.event_name == 'pull_request' && 'http://127.0.0.1:8000/' || 'https://lorenzovonmatterhom.github.io/revolt-clone/' }} node tests/browser-startup.mjs
