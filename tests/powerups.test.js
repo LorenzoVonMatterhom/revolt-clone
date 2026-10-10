@@ -221,6 +221,27 @@ test("AI racers collect and activate held pickups after roulette", () => {
   f.cleanup();
 });
 
+test("electro pulse creates an animated car aura and cleans it up on expiry and reset", () => {
+  const f = fixture(), racer = f.racers[0];
+  try {
+    awardPowerup(racer.powerups, power("electro"), false); f.system.fire(racer, f.racers);
+    const aura = racer.mesh.userData.electricPulse;
+    assert.ok(aura?.material.isShaderMaterial);
+    assert.equal(aura.parent, racer.mesh);
+    assert.equal(aura.material.depthWrite, false);
+    f.system.update(0.1, f.racers);
+    assert.ok(aura.material.uniforms.time.value > 0);
+    assert.equal(racer.mesh.userData.electricPulse, aura, "Aura should reuse its geometry each frame");
+    f.system.update(8, f.racers);
+    assert.equal(racer.mesh.userData.electricPulse, undefined);
+    assert.equal(aura.parent, null);
+    f.system.debugGive(racer,"electro"); f.system.fire(racer,f.racers);
+    assert.ok(racer.mesh.userData.electricPulse);
+    f.system.reset(f.racers);
+    assert.equal(racer.mesh.userData.electricPulse, undefined);
+  } finally { f.cleanup(); }
+});
+
 test("water balloons travel over 100 units before landing and inherit car speed", () => {
   for (const carSpeed of [0, 30]) {
     const f = fixture();
