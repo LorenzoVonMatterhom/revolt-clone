@@ -40,7 +40,7 @@ test("submerged cars slow down and settle near the surface through buoyancy", as
   let splashes = 0; water.onSplash = () => splashes++;
   for (let i=0;i<1200;i++) { water.applyCar(car,1/120); world.step(); }
   assert.ok(Math.abs(body.linvel().x)<0.1, "Water drag must slow the car");
-  assert.ok(body.translation().y>-1 && body.translation().y<0.5, "Car should float near the surface");
+  assert.ok(body.translation().y>-1 && body.translation().y<0.5, "Car should float near the surface: " + JSON.stringify({position:body.translation(),velocity:body.linvel(),mass:body.mass(),fraction:car.waterFraction}));
   assert.equal(splashes,1);
   body.setTranslation({x:30,y:-2,z:0},true);
   body.setLinvel({x:4,y:0,z:0},true);
