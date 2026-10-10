@@ -52,7 +52,7 @@ const clock = new THREE.Clock();
 
 const keys = new Map();
 let raceStarted = false;
-const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading });
+const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading, onFire: () => powerups.fire(player, racers) });
 let cameraMode = 0;
 let muted = false;
 let elapsedRace = 0;
@@ -624,6 +624,7 @@ function updateHud() {
     powerName.textContent = state.bomb > 0 ? "Bomb" : state.rolling > 0 ? "Selecting..." : state.held?.name ?? "No Pick Up";
     powerStatus.textContent = state.bomb > 0 ? `${state.bomb.toFixed(1)} s` : state.disabled > 0 ? `Power cut: ${state.disabled.toFixed(1)} s` : state.boost > 0 ? `Turbo: ${state.boost.toFixed(1)} s` : state.electro > 0 ? `Pulse: ${state.electro.toFixed(1)} s` : state.shots > 0 ? `${state.shots} / ${state.held.shots}` : "";
     powerBtn.disabled = !state.held || state.rolling > 0 || state.cooldown > 0 || !raceStarted;
+    touchControls.setFireEnabled(!powerBtn.disabled);
     debugStatus.textContent = `${powerName.textContent}${powerStatus.textContent ? ` - ${powerStatus.textContent}` : ""}`;
     document.querySelector("#debugUse").disabled = powerBtn.disabled;
   }
