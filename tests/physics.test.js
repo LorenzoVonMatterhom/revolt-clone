@@ -137,6 +137,31 @@ test("player steering gain increases front-wheel angle without changing default 
   physics.dispose();
 });
 
+test("Cougar and RC Bandit get at least 54 degrees of player steering in both directions", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => new Response(readFileSync(String(url).slice(1)));
+  try {
+    for (const id of ["cougar","rc"]) {
+      const ground = new THREE.Group(); box(ground,[100,1,100],[0,-0.5,0]);
+      const physics = new MeshPhysics(ground), mesh = await loadCar(id,id), car = physics.createCar(mesh);
+      try {
+        for (const input of [-1,1]) {
+          physics.updateVehicle(car,1/120,0,0,input,false,1,2.1);
+          car.setup.wheels.forEach((wheel,i) => {
+            const angle = car.vehicle.wheelSteering(i);
+            if (wheel.turnable) assert.ok(angle * input >= 54 * Math.PI/180 && Math.abs(angle) <= 1.05001);
+            else assert.equal(angle,0);
+          });
+        }
+        physics.updateVehicle(car,1/120,0,0,1,false);
+        car.setup.wheels.forEach((wheel,i) => {
+          if (wheel.turnable) assert.ok(Math.abs(car.vehicle.wheelSteering(i) - wheel.steerRatio) < 0.00001,"AI must retain stock steering");
+        });
+      } finally { physics.dispose(); mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();}); }
+    }
+  } finally { globalThis.fetch=originalFetch; }
+});
+
 test("oil retains lateral sliding and spin, then normal grip returns", () => {
   const simulate = (traction) => {
     const ground = new THREE.Group(); box(ground, [500,1,500], [0,-0.5,0]);

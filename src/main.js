@@ -372,7 +372,7 @@ class CarController {
     const reversing = brake && speed < 2;
     this.throttle = throttle - (reversing ? brake : 0);
     if (this.powerups?.disabled > 0) this.throttle = 0;
-    physics.updateVehicle(this.car, dt, this.throttle * (this.powerups?.boost > 0 ? 1.1 : 1), reversing ? 0 : brake, this.steer, handbrake, this.powerups?.slippery > 0 ? 0.025 : 1, this.isPlayer ? 1.45 : 1);
+    physics.updateVehicle(this.car, dt, this.throttle * (this.powerups?.boost > 0 ? 1.1 : 1), reversing ? 0 : brake, this.steer, handbrake, this.powerups?.slippery > 0 ? 0.025 : 1, this.isPlayer ? 2.1 : 1);
     this.bumpCooldown = Math.max(0, this.bumpCooldown - dt);
 
     this.updateProgress(trackData);

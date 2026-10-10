@@ -213,7 +213,10 @@ export class MeshPhysics {
     for (let i = 0; i < car.vehicle.numWheels(); i++) {
       const front = car.setup.wheels[i].position.z > 0;
       const wheel = car.setup.wheels[i];
-      car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * (wheel.steerRatio ?? 0.45) * steeringGain, -0.8, 0.8) : 0);
+      // Give player cars usable lock even when stock ratios are small (Cougar: 0.25).
+      const steerRatio = steeringGain > 1 ? Math.max(0.45, wheel.steerRatio ?? 0.45) : (wheel.steerRatio ?? 0.45);
+      const steeringLimit = steeringGain > 1 ? 1.05 : 0.8;
+      car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * steerRatio * steeringGain, -steeringLimit, steeringLimit) : 0);
       car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * 360 * (1 - 0.65 * waterFraction) * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
       car.vehicle.setWheelBrake(i, brake * 18 + (handbrake && !front ? 30 : 0));
       car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction * (1 - 0.6 * waterFraction));
