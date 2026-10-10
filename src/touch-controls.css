@@ -1,0 +1,51 @@
+.touch-controls { display: none; }
+@media (any-pointer: coarse) {
+  #scene { touch-action: none; }
+  .touch-controls {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom)); gap: 12px;
+  }
+  .touch-control-group { display: flex; gap: 8px; pointer-events: auto; }
+  .touch-controls button {
+    width: clamp(48px, 11vw, 72px); height: clamp(60px, 14vw, 80px);
+    padding: 0; font-size: 14px; touch-action: none;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    background: rgba(14, 18, 24, 0.8); border: 2px solid rgba(255,255,255,0.45);
+  }
+  .touch-controls button[data-code="KeyW"] { background: rgba(52, 120, 55, 0.85); }
+  .touch-controls button.is-pressed { background: #f1c94b; color: #101010; border-color: #fff; }
+  .hud-top { top: max(8px, env(safe-area-inset-top)); left: 12px; right: 12px; flex-direction: row; }
+  .brand, .help, .debug-panel { display: none; }
+  .readouts { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .readouts div { min-height: 42px; padding: 4px 8px; }
+  .readouts strong { font-size: 1rem; }
+  .hud-left {
+    left: 12px; right: 12px; top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+    bottom: auto; padding: 4px; gap: 6px; justify-content: flex-end; flex-wrap: wrap;
+    background: transparent; border: 0; box-shadow: none; backdrop-filter: none;
+    pointer-events: none;
+  }
+  .hud-left button { pointer-events: auto; padding: 0 10px; min-height: 44px; font-size: 12px; }
+  .hud-left #levelSelect, .hud-left #nextLevelBtn { display: none; }
+  .powerup-slot {
+    top: calc(max(8px, env(safe-area-inset-top)) + 102px);
+    left: 12px; width: min(220px, calc(100% - 130px)); min-height: 64px;
+  }
+  .powerup-slot button { touch-action: manipulation; }
+  .minimap {
+    top: calc(max(8px, env(safe-area-inset-top)) + 102px);
+    right: 12px; bottom: auto; width: 88px; height: 88px;
+  }
+  .start { overflow-y: auto; pointer-events: auto; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .start-panel { margin: auto 0; }
+}
+@media (any-pointer: coarse) and (max-height: 500px) {
+  .start { align-items: flex-start; padding-top: 8px; }
+  .start-panel { width: 300px; padding: 10px; }
+  .start h1 { font-size: 24px; margin: 0; }
+  .start h2 { font-size: 16px; margin: 6px 0; }
+  .start h3, #carStats { display: none; }
+  .track-label { margin-top: 8px; }
+  .minimap { width: 64px; height: 64px; }
+}
