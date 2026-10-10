@@ -45,7 +45,8 @@ const TIRE_GROUPS = (2 << 16) | 3;
 const OBSTACLE_GROUPS = (2 << 16) | 2;
 
 export class MeshPhysics {
-  constructor(group) {
+  constructor(group, water = null) {
+    this.water = water;
     this.world = new RAPIER.World({ x: 0, y: -42, z: 0 });
     this.world.timestep = 1 / 120;
     this.world.integrationParameters.numSolverIterations = 8;
@@ -202,6 +203,7 @@ export class MeshPhysics {
   }
 
   updateVehicle(car, dt, throttle, brake, steering, handbrake, traction = 1, steeringGain = 1) {
+    const waterFraction = this.water?.applyCar(car, dt) ?? 0;
     car.driveIntent = Math.abs(throttle) > 0.1;
     const slippery = traction < 1;
     car.body.setAngularDamping(slippery ? 0.12 : 1.5);
@@ -211,9 +213,9 @@ export class MeshPhysics {
       const front = car.setup.wheels[i].position.z > 0;
       const wheel = car.setup.wheels[i];
       car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * (wheel.steerRatio ?? 0.45) * steeringGain, -0.8, 0.8) : 0);
-      car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * 360 * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
+      car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * 360 * (1 - 0.65 * waterFraction) * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
       car.vehicle.setWheelBrake(i, brake * 18 + (handbrake && !front ? 30 : 0));
-      car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction);
+      car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction * (1 - 0.6 * waterFraction));
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
     car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
