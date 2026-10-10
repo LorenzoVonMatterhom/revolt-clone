@@ -38,6 +38,12 @@ export function meshTriangles(group) {
   return { vertices, indices };
 }
 
+// Chassis contacts all terrain; tires contact steep obstacle faces, not the road.
+const CHASSIS_GROUPS = (1 << 16) | 3;
+const TERRAIN_GROUPS = (1 << 16) | 1;
+const TIRE_GROUPS = (2 << 16) | 3;
+const OBSTACLE_GROUPS = (2 << 16) | 2;
+
 export class MeshPhysics {
   constructor(group) {
     this.world = new RAPIER.World({ x: 0, y: -42, z: 0 });
@@ -48,7 +54,20 @@ export class MeshPhysics {
     this.triangleCount = indices.length / 3;
     this.bounds = new THREE.Box3().setFromArray(vertices);
     // One welded trimesh avoids false collisions at material/texture boundaries.
-    this.terrain = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES | RAPIER.TriMeshFlags.ORIENTED).setFriction(0.8).setRestitution(0));
+    this.terrain = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES | RAPIER.TriMeshFlags.ORIENTED).setFriction(0.8).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS));
+    const obstacleIndices = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (let i = 0; i < indices.length; i += 3) {
+      a.fromArray(vertices, indices[i] * 3);
+      b.fromArray(vertices, indices[i + 1] * 3).sub(a);
+      c.fromArray(vertices, indices[i + 2] * 3).sub(a);
+      const normal = b.cross(c).normalize();
+      if (Math.abs(normal.y) < 0.65) obstacleIndices.push(indices[i], indices[i + 1], indices[i + 2]);
+    }
+    this.wheelObstacles = obstacleIndices.length ? this.world.createCollider(
+      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(obstacleIndices), RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES)
+        .setFriction(0.05).setRestitution(0).setCollisionGroups(OBSTACLE_GROUPS)
+    ) : null;
     this.world.step();
   }
 
@@ -65,7 +84,7 @@ export class MeshPhysics {
     const hull = setup.bodyVertices?.length >= 12 ? RAPIER.ColliderDesc.convexHull(setup.bodyVertices) : null;
     const shapeOffset = hull ? new THREE.Vector3() : center.clone();
     const descriptor = hull ?? RAPIER.ColliderDesc.cuboid(size.x, size.y, size.z).setTranslation(center.x, center.y, center.z);
-    const collider = this.world.createCollider(descriptor.setMass(8).setFriction(0.3).setRestitution(0.02).setContactSkin(0.02), body);
+    const collider = this.world.createCollider(descriptor.setMass(8).setFriction(0.3).setRestitution(0.02).setContactSkin(0.02).setCollisionGroups(CHASSIS_GROUPS), body);
     const vehicle = this.world.createVehicleController(body);
     vehicle.indexUpAxis = 1;
     vehicle.setIndexForwardAxis = 2;
@@ -81,7 +100,18 @@ export class MeshPhysics {
       vehicle.setWheelFrictionSlip(i, 2.5);
       vehicle.setWheelSideFrictionStiffness(i, 1);
     }
-    return { body, vehicle, setup, collider, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false };
+    // Suspension rays provide grip; rounded tire shapes prevent side walls and
+    // object edges from entering wheels outside the narrower chassis hull.
+    const wheelColliders = setup.wheels.map((wheel) => {
+      const radius = wheel.radius * 0.92;
+      const halfWidth = wheel.halfWidth ?? wheel.radius * 0.35;
+      const tire = RAPIER.ColliderDesc.roundCylinder(halfWidth, radius, Math.min(0.05, radius * 0.1))
+        .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))
+        .setTranslation(wheel.position.x, wheel.position.y, wheel.position.z)
+        .setMass(0).setFriction(0.05).setRestitution(0).setContactSkin(0.01).setCollisionGroups(TIRE_GROUPS);
+      return this.world.createCollider(tire, body);
+    });
+    return { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false };
   }
 
   overlapsCar(car, position, rotation) {
@@ -93,7 +123,14 @@ export class MeshPhysics {
     const clearanceCenter=new THREE.Vector3(bodyCenter.x,(bottom+top)/2,bodyCenter.z);
     const clearanceShape=new RAPIER.Cuboid(size.x+0.4,(top-bottom)/2,size.z+0.4);
     if(this.world.intersectionWithShape(clearanceCenter,rotation,clearanceShape,RAPIER.QueryFilterFlags.EXCLUDE_FIXED|RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC|RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,undefined,car.collider,car.body)) return true;
-    return Boolean(this.world.intersectionWithShape(center, rotation, car.collider.shape, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, car.collider, car.body));
+    if (this.world.intersectionWithShape(center, rotation, car.collider.shape, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, car.collider, car.body)) return true;
+    return car.wheelColliders.some((tire) => {
+      const local = new THREE.Vector3().copy(tire.translationWrtParent());
+      const tireCenter = local.applyQuaternion(rotation).add(position);
+      const tireRotation = new THREE.Quaternion().copy(rotation).multiply(new THREE.Quaternion().copy(tire.rotationWrtParent()));
+      return Boolean(this.world.intersectionWithShape(tireCenter, tireRotation, tire.shape,
+        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, TIRE_GROUPS, tire, car.body));
+    });
   }
 
   placeCar(car, requested, rotation) {
@@ -136,10 +173,15 @@ export class MeshPhysics {
       if (car.safePose) this.placeCar(car, car.safePose.position, car.safePose.rotation);
       return;
     }
-    const contact = car.collider.contactCollider(this.terrain, 0);
+    const contacts = [
+      car.collider.contactCollider(this.terrain, 0),
+      ...(this.wheelObstacles ? car.wheelColliders.map((tire) => tire.contactCollider(this.wheelObstacles, 0)) : []),
+    ].filter(Boolean);
+    const contact = contacts.find((hit) => hit.distance < -0.2) ?? contacts[0];
+    const obstacleContact = contacts.some((hit) => Math.abs(hit.normal1.y) < 0.65);
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).y;
     const stationary = Math.hypot(velocity.x, velocity.z) < 2;
-    car.blockedTime = stationary && (upright < 0.25 || (car.driveIntent && contact)) ? car.blockedTime + dt : 0;
+    car.blockedTime = stationary && (upright < 0.25 || (car.driveIntent && obstacleContact)) ? car.blockedTime + dt : 0;
     const stacked=cars.some(other=>{
       if(other===car||position.y-other.body.translation().y<1) return false;
       const support=car.collider.contactCollider(other.collider,0.03);
@@ -154,7 +196,7 @@ export class MeshPhysics {
       return;
     }
     // Keep a previously clear resting pose, not the latest position pressed into a wall.
-    if (!contact && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {
+    if (!car.collider.contactCollider(this.terrain, 0) && !obstacleContact && !deeplyEmbedded && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {
       car.safePose = { position, rotation };
     }
   }
@@ -175,6 +217,13 @@ export class MeshPhysics {
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
     car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
+    car.wheelColliders.forEach((tire, i) => {
+      const wheel = car.setup.wheels[i];
+      const suspension = car.vehicle.wheelSuspensionLength(i) ?? 0.6;
+      tire.setTranslationWrtParent({ x: wheel.position.x, y: wheel.position.y + 0.6 - suspension, z: wheel.position.z });
+      const steeringRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), car.vehicle.wheelSteering(i) ?? 0);
+      tire.setRotationWrtParent(steeringRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2)));
+    });
   }
 
   step() { this.world.step(); }
