@@ -22,7 +22,7 @@ export function createTouchControls({ enabled, onFire = () => {} }) {
   const pointers = new Map();
   const groups = [
     [["KeyA", "◀", "Steer left"], ["KeyD", "▶", "Steer right"]],
-    [["Space", "Slide", "Handbrake"], ["KeyS", "Brake", "Brake or reverse"], ["KeyW", "Gas", "Accelerate"]],
+    [["KeyS", "Brake", "Brake or reverse"], ["KeyW", "Gas", "Accelerate"]],
   ];
   for (const actions of groups) {
     const group = document.createElement("div");
