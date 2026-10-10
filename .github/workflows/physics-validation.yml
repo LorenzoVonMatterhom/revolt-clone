@@ -20,6 +20,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Antenna spring regressions
+        run: node --test tests/antenna.test.js
       - name: Wheel collision regressions
         run: node --test tests/wheel-collisions.test.js
       - run: npm test
