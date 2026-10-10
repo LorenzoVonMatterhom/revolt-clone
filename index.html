@@ -355,7 +355,7 @@ select:focus-visible {
   }
   .touch-controls button[data-code="KeyW"] { background: rgba(52, 120, 55, 0.85); }
   .touch-controls button.is-pressed { background: #f1c94b; color: #101010; border-color: #fff; }
-  .touch-pedals { display: grid; grid-template-columns: repeat(3, auto); }
+  .touch-pedals { display: grid; grid-template-columns: repeat(2, auto); }
   .touch-controls .touch-fire {
     grid-column: 1 / -1; width: 100%; height: 48px;
     background: #b3312c; border-color: #ef746d; font-size: 16px;
@@ -2960,7 +2960,7 @@ export function createTouchControls({ enabled, onFire = () => {} }) {
   const pointers = new Map();
   const groups = [
     [["KeyA", "◀", "Steer left"], ["KeyD", "▶", "Steer right"]],
-    [["Space", "Slide", "Handbrake"], ["KeyS", "Brake", "Brake or reverse"], ["KeyW", "Gas", "Accelerate"]],
+    [["KeyS", "Brake", "Brake or reverse"], ["KeyW", "Gas", "Accelerate"]],
   ];
   for (const actions of groups) {
     const group = document.createElement("div");
