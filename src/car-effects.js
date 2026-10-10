@@ -82,3 +82,104 @@ export class CarEngineAudio {
     this.audio.setVolume(this.profile.idleVolume + this.revs * 0.22 + load * 0.07);
   }
 }
+
+export class FlexibleAntenna {
+  constructor(car, { offset, direction, length, stiffness = 2000, damping = 5.5 }) {
+    this.car = car;
+    this.offset = offset.clone();
+    this.direction = direction.clone().normalize();
+    this.length = length;
+    this.count = 8;
+    this.segmentLength = length / this.count;
+    this.stiffness = THREE.MathUtils.clamp(stiffness * 0.04, 45, 180);
+    this.damping = THREE.MathUtils.clamp(damping, 4, 12);
+    this.points = Array.from({ length: this.count + 1 }, () => new THREE.Vector3());
+    this.velocities = this.points.map(() => new THREE.Vector3());
+    this.lastAnchor = new THREE.Vector3();
+    this.initialized = false;
+    this.group = new THREE.Group();
+    this.group.name = "Flexible antenna";
+    const material = new THREE.MeshBasicMaterial({ color: 0x17191c });
+    const radius = Math.max(0.025, length * 0.015);
+    this.rods = Array.from({ length: this.count }, () => {
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, this.segmentLength, 5), material);
+      this.group.add(rod);
+      return rod;
+    });
+    this.tip = new THREE.Mesh(new THREE.SphereGeometry(radius * 2.3, 8, 6), new THREE.MeshBasicMaterial({ color: 0xd3272e }));
+    this.group.add(this.tip);
+    car.add(this.group);
+    this.reset();
+  }
+
+  reset() {
+    this.car.updateMatrixWorld(true);
+    this.points.forEach((point, i) => {
+      point.copy(this.offset).addScaledVector(this.direction, i * this.segmentLength);
+      this.car.localToWorld(point);
+      this.velocities[i].set(0, 0, 0);
+    });
+    this.lastAnchor.copy(this.points[0]);
+    this.initialized = true;
+    this.draw();
+  }
+
+  update(dt) {
+    if (!(dt > 0)) return;
+    this.car.updateMatrixWorld(true);
+    const anchor = this.car.localToWorld(this.offset.clone());
+    const travel = anchor.clone().sub(this.lastAnchor);
+    // Teleports and car resets must not launch the aerial across the track.
+    if (travel.length() > this.length * 3) { this.reset(); return; }
+    const duration = Math.min(dt, 0.05);
+    const steps = Math.max(1, Math.ceil(duration * 120));
+    const h = duration / steps;
+    const baseVelocity = travel.clone().divideScalar(duration);
+    const rotation = this.car.getWorldQuaternion(new THREE.Quaternion());
+    const up = this.direction.clone().applyQuaternion(rotation);
+    const previous = this.points.map(point => point.clone());
+    for (let step = 1; step <= steps; step++) {
+      const base = this.lastAnchor.clone().lerp(anchor, step / steps);
+      previous.forEach((point, i) => point.copy(this.points[i]));
+      this.points[0].copy(base);
+      for (let i = 1; i <= this.count; i++) {
+        const target = base.clone().addScaledVector(up, i * this.segmentLength);
+        const force = target.sub(this.points[i]).multiplyScalar(this.stiffness)
+          .addScaledVector(this.velocities[i].clone().sub(baseVelocity), -this.damping);
+        force.y -= 2;
+        // Air resistance bends the aerial back as speed increases.
+        force.addScaledVector(baseVelocity, -0.025 * baseVelocity.length());
+        this.velocities[i].addScaledVector(force, h);
+        this.points[i].addScaledVector(this.velocities[i], h);
+      }
+      for (let pass = 0; pass < 6; pass++) {
+        this.points[0].copy(base);
+        for (let i = 1; i <= this.count; i++) {
+          const delta = this.points[i].clone().sub(this.points[i - 1]);
+          const distance = delta.length();
+          if (distance < 0.000001) continue;
+          const correction = delta.multiplyScalar((distance - this.segmentLength) / distance);
+          this.points[i].addScaledVector(correction, i === 1 ? -1 : -0.5);
+          if (i > 1) this.points[i - 1].addScaledVector(correction, 0.5);
+        }
+      }
+      for (let i = 1; i <= this.count; i++) {
+        this.velocities[i].copy(this.points[i]).sub(previous[i]).divideScalar(h);
+      }
+    }
+    this.lastAnchor.copy(anchor);
+    this.draw();
+  }
+
+  draw() {
+    const local = this.points.map(point => this.car.worldToLocal(point.clone()));
+    const axis = new THREE.Vector3(0, 1, 0);
+    this.rods.forEach((rod, i) => {
+      const delta = local[i + 1].clone().sub(local[i]);
+      rod.position.copy(local[i]).add(local[i + 1]).multiplyScalar(0.5);
+      rod.scale.y = delta.length() / this.segmentLength;
+      if (delta.lengthSq() > 0) rod.quaternion.setFromUnitVectors(axis, delta.normalize());
+    });
+    this.tip.position.copy(local[this.count]);
+  }
+}
