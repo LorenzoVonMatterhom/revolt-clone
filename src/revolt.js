@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FlexibleAntenna } from "./car-effects.js";
 import { gameAssetUrl } from "./assets.js";
 import { computeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 
@@ -298,5 +299,16 @@ export async function loadCar(id, name) {
       return { position: wheel.position.clone().add(visual.position), radius: size.y * 0.5, halfWidth: size.x * 0.5, turnable: wheel.userData.turnable, powered: wheel.userData.powered, steerRatio: wheel.userData.steerRatio, engineRatio: wheel.userData.engineRatio };
     }),
   };
+  const aerial = parameters.match(/AERIAL\s*\{([^}]+)\}/i)?.[1] ?? "";
+  const values = (name, fallback) => aerial.split(/\r?\n/).map(line => line.trim().split(/[\s,]+/)).find(fields => fields[0].toLowerCase() === name.toLowerCase())?.slice(1).map(Number) ?? fallback;
+  const offset = new THREE.Vector3(...converted(values("Offset", [0, -bodyBounds.max.y / RV_SCALE, -bodyBounds.max.z / RV_SCALE * 0.5]))).add(visual.position);
+  const direction = new THREE.Vector3(...converted(values("Direction", [0, -1, 0]))).normalize();
+  if (direction.lengthSq() === 0) direction.set(0, 1, 0);
+  root.userData.antenna = new FlexibleAntenna(root, {
+    offset, direction,
+    length: Math.max(1.2, (values("Length", [20])[0] || 20) * RV_SCALE),
+    stiffness: values("Stiffness", [2000])[0],
+    damping: values("Damping", [5.5])[0],
+  });
   return root;
 }
