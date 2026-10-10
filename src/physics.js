@@ -81,7 +81,18 @@ export class MeshPhysics {
       vehicle.setWheelFrictionSlip(i, 2.5);
       vehicle.setWheelSideFrictionStiffness(i, 1);
     }
-    return { body, vehicle, setup, collider, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false };
+    // Suspension rays provide grip; rounded tire shapes prevent side walls and
+    // object edges from entering wheels outside the narrower chassis hull.
+    const wheelColliders = setup.wheels.map((wheel) => {
+      const radius = wheel.radius * 0.92;
+      const halfWidth = wheel.halfWidth ?? wheel.radius * 0.35;
+      const tire = RAPIER.ColliderDesc.roundCylinder(halfWidth, radius, Math.min(0.05, radius * 0.1))
+        .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))
+        .setTranslation(wheel.position.x, wheel.position.y, wheel.position.z)
+        .setMass(0).setFriction(0.05).setRestitution(0).setContactSkin(0.01);
+      return this.world.createCollider(tire, body);
+    });
+    return { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false };
   }
 
   overlapsCar(car, position, rotation) {
@@ -93,7 +104,14 @@ export class MeshPhysics {
     const clearanceCenter=new THREE.Vector3(bodyCenter.x,(bottom+top)/2,bodyCenter.z);
     const clearanceShape=new RAPIER.Cuboid(size.x+0.4,(top-bottom)/2,size.z+0.4);
     if(this.world.intersectionWithShape(clearanceCenter,rotation,clearanceShape,RAPIER.QueryFilterFlags.EXCLUDE_FIXED|RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC|RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,undefined,car.collider,car.body)) return true;
-    return Boolean(this.world.intersectionWithShape(center, rotation, car.collider.shape, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, car.collider, car.body));
+    if (this.world.intersectionWithShape(center, rotation, car.collider.shape, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, car.collider, car.body)) return true;
+    return car.wheelColliders.some((tire) => {
+      const local = new THREE.Vector3().copy(tire.translationWrtParent());
+      const tireCenter = local.applyQuaternion(rotation).add(position);
+      const tireRotation = new THREE.Quaternion().copy(rotation).multiply(new THREE.Quaternion().copy(tire.rotationWrtParent()));
+      return Boolean(this.world.intersectionWithShape(tireCenter, tireRotation, tire.shape,
+        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, tire, car.body));
+    });
   }
 
   placeCar(car, requested, rotation) {
@@ -136,10 +154,13 @@ export class MeshPhysics {
       if (car.safePose) this.placeCar(car, car.safePose.position, car.safePose.rotation);
       return;
     }
-    const contact = car.collider.contactCollider(this.terrain, 0);
+    const contacts = [car.collider, ...car.wheelColliders]
+      .map((collider) => collider.contactCollider(this.terrain, 0)).filter(Boolean);
+    const contact = contacts.find((hit) => hit.distance < -0.2) ?? contacts[0];
+    const obstacleContact = contacts.some((hit) => Math.abs(hit.normal1.y) < 0.65);
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).y;
     const stationary = Math.hypot(velocity.x, velocity.z) < 2;
-    car.blockedTime = stationary && (upright < 0.25 || (car.driveIntent && contact)) ? car.blockedTime + dt : 0;
+    car.blockedTime = stationary && (upright < 0.25 || (car.driveIntent && obstacleContact)) ? car.blockedTime + dt : 0;
     const stacked=cars.some(other=>{
       if(other===car||position.y-other.body.translation().y<1) return false;
       const support=car.collider.contactCollider(other.collider,0.03);
@@ -154,7 +175,7 @@ export class MeshPhysics {
       return;
     }
     // Keep a previously clear resting pose, not the latest position pressed into a wall.
-    if (!contact && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {
+    if (!car.collider.contactCollider(this.terrain, 0) && !obstacleContact && !deeplyEmbedded && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {
       car.safePose = { position, rotation };
     }
   }
@@ -175,6 +196,13 @@ export class MeshPhysics {
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
     car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
+    car.wheelColliders.forEach((tire, i) => {
+      const wheel = car.setup.wheels[i];
+      const suspension = car.vehicle.wheelSuspensionLength(i) ?? 0.6;
+      tire.setTranslationWrtParent({ x: wheel.position.x, y: wheel.position.y + 0.6 - suspension, z: wheel.position.z });
+      const steeringRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), car.vehicle.wheelSteering(i) ?? 0);
+      tire.setRotationWrtParent(steeringRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2)));
+    });
   }
 
   step() { this.world.step(); }
