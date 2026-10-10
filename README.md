@@ -1,37 +1,29 @@
-# Re-Volt Three.js Clone
+# Re-Volt Browser Game
 
-A browser-based RC racing prototype using Three.js, Rapier, and the game assets supplied with this project.
+The game runs directly from `index.html`. Its styles, game modules, asset manifest, and phone controls are embedded in that HTML page. There is no npm installation or Vite compilation step to play or publish it.
 
-## Development
+Keep the `cars`, `gfx`, `levels`, `models`, and `wavs` folders next to the HTML page. Three.js, Rapier, and three-mesh-bvh load from pinned CDN URLs, so an internet connection is required. Serve the page over HTTP; opening it with a file:// URL does not support the game's asset requests.
+
+## Local play
+
+Run a static server from the repository folder:
 
 ```sh
-npm ci
-npm run dev
+python3 -m http.server 8000 --bind 0.0.0.0
 ```
+
+Open http://localhost:8000/ on your computer, or http://YOUR_COMPUTER_IP:8000/ on a phone connected to the same Wi-Fi. Edit `index.html` and refresh to see changes immediately.
 
 ## Controls
 
-- WASD or arrow keys: drive
-- Space: handbrake
-- F or left Ctrl: use power-up
-- R: reset car
-- C: change camera
-- Escape: main menu
+- Phone: tap Start Race, then hold Gas and the left/right steering buttons together. Brake also reverses; Slide is the handbrake. Tap the power-up icon to use it.
+- Keyboard: WASD or arrows drive; Space handbrake; F or left Ctrl uses a power-up; R resets; C changes camera; Escape opens the menu.
 
-The temporary Debug panel can give, activate, and clear power-ups during races.
+## Public site
 
-## Tests and Build
+The GitHub Actions workflow only copies and publishes the static HTML and asset folders on pushes to main. It does not install dependencies, run Vite, or compile the game. GitHub Pages still needs a short publishing step to make changed repository files available on the public URL.
 
-```sh
-npm test
-npm run build
-```
-
-## Online Preview
-
-The GitHub Actions workflow builds and deploys the game to GitHub Pages on pushes to `main`. In repository Settings > Pages, select **GitHub Actions** as the deployment source.
-
-For a repository-scoped local production build, set `GITHUB_PAGES=true` before running `npm run build`.
+For runtime edits, change the embedded modules and styles in `index.html`. The `src` files and existing Node tests remain as reference sources; editing those files alone does not change the embedded HTML game.
 
 ## Asset Rights
 

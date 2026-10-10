@@ -5,6 +5,39 @@ import { FRONTEND } from "./levels.js";
 
 export const STOCK_CARS = ["rc", "tc6", "phat", "volken", "beatall", "mouse", "candy", "mite", "r5", "tc1", "mud", "moss", "gencar", "tc5", "tc4", "dino", "adeon", "tc3", "fone", "rotor", "amw", "flag", "sgt", "tc2", "cougar", "toyeca", "sugo", "panga"];
 
+
+// The shop corner between SALEBIN (265, -181) and MAGSTAND (233, -85).
+// Coordinates use the same converted world units as the original frontend.
+export const CAR_DISPLAY = { center: [242, 0, -134], radius: 32, columns: 7, rows: 4, scale: 0.7 };
+
+export function boxShelfPose(index) {
+  const column = index % CAR_DISPLAY.columns;
+  const row = Math.floor(index / CAR_DISPLAY.columns);
+  const angle = -1.15 + column * 2.3 / (CAR_DISPLAY.columns - 1);
+  return {
+    position: [CAR_DISPLAY.center[0] + Math.cos(angle) * CAR_DISPLAY.radius,
+      4.82 + row * 10.2, CAR_DISPLAY.center[2] + Math.sin(angle) * CAR_DISPLAY.radius],
+    rotation: -Math.PI / 2 - angle,
+  };
+}
+
+function addBoxShelves(scene) {
+  const wood = new THREE.MeshBasicMaterial({ color: 0x80602d });
+  // Short boards follow the curve instead of cutting across the shop corner.
+  for (let row = 0; row < CAR_DISPLAY.rows; row++) {
+    for (let column = 0; column < CAR_DISPLAY.columns - 1; column++) {
+      const a = new THREE.Vector3(...boxShelfPose(row * CAR_DISPLAY.columns + column).position);
+      const b = new THREE.Vector3(...boxShelfPose(row * CAR_DISPLAY.columns + column + 1).position);
+      const board = new THREE.Mesh(new THREE.BoxGeometry(9, 0.6, a.distanceTo(b) + 2), wood);
+      board.position.copy(a).add(b).multiplyScalar(0.5);
+      board.position.x += 3;
+      board.position.y -= 4.9;
+      board.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+      scene.add(board);
+    }
+  }
+}
+
 export function carDetails(text, id) {
   const clean = text.replace(/;[^\r\n]*/g, "");
   const number = (key) => Number(clean.match(new RegExp(`^\\s*${key}\\s+([-\\d.]+)`, "im"))?.[1] ?? 0);
@@ -77,13 +110,17 @@ export class Showroom {
     const response = await fetch(gameAssetUrl("/levels/frontend/carbox.m"));
     const model = labeledBox(parsePrm(await response.arrayBuffer()));
     showroom.cars = await Promise.all(STOCK_CARS.map(async (id) => carDetails(await (await fetch(gameAssetUrl(`/cars/${id}/parameters.txt`))).text(), id)));
-    // A compact four-tier pile in the original shop, not a generated race environment.
+    // Four curved shelves in the original shop corner shown in the reference.
+    addBoxShelves(showroom.scene);
     for (const [index, details] of showroom.cars.entries()) {
       const car = await loadCar(details.id, details.name);
       const label = boxLabel(renderer, car, details, loaded.textures[4]);
       const box = makeMeshes([model], { ...loaded.textures, 7: label }, [0, 0, 0]);
-      box.scale.setScalar(0.7);
-      box.position.set((index % 7 - 3) * 12.1 + (Math.floor(index / 7) % 2) * 1.3, 4.8 + Math.floor(index / 7) * 9.7, -280);
+      const pose = boxShelfPose(index);
+      box.scale.setScalar(CAR_DISPLAY.scale);
+      box.position.set(...pose.position);
+      box.rotation.y = pose.rotation;
+      box.userData.homeRotation = pose.rotation;
       box.userData.home = box.position.clone(); box.userData.carIndex = index;
       showroom.boxes.push(box); showroom.scene.add(box);
     }
@@ -113,13 +150,18 @@ export class Showroom {
 
   render(renderer, dt, aspect) {
     this.camera.aspect = aspect; this.camera.updateProjectionMatrix();
-    this.camera.position.set(0, 70, aspect < 1 ? -40 : -170);
-    this.camera.lookAt(aspect < 1 ? 0 : -20, aspect < 1 ? -30 : 25, -280);
+    // Face the sale-display / magazine-rack corner, rather than the central aisle.
+    const portrait = aspect < 1;
+    this.camera.position.set(portrait ? 118 : 145, portrait ? 82 : 76, -134);
+    this.camera.lookAt(256, portrait ? 35 : 28, -134);
     for (const [i, box] of this.boxes.entries()) {
-      const target = i === this.selected ? new THREE.Vector3(aspect < 1 ? 0 : 25, 32, -233) : box.userData.home;
+      const target = i === this.selected ? new THREE.Vector3(225, portrait ? 49 : 42, portrait ? -134 : -112) : box.userData.home;
       box.position.lerp(target, 1 - Math.exp(-dt * 9));
-      box.scale.setScalar(i === this.selected ? 1.5 : 0.7);
-      box.rotation.y = i === this.selected ? 0.25 : 0;
+      const blend = 1 - Math.exp(-dt * 9);
+      const scale = i === this.selected ? 1.5 : CAR_DISPLAY.scale;
+      box.scale.lerp(new THREE.Vector3(scale, scale, scale), blend);
+      const rotation = i === this.selected ? -Math.PI / 2 + 0.12 : box.userData.homeRotation;
+      box.rotation.y += (rotation - box.rotation.y) * blend;
     }
     renderer.render(this.scene, this.camera);
   }
