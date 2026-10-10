@@ -221,6 +221,24 @@ test("AI racers collect and activate held pickups after roulette", () => {
   f.cleanup();
 });
 
+test("water balloons travel over 100 units before landing and inherit car speed", () => {
+  for (const carSpeed of [0, 30]) {
+    const f = fixture();
+    try {
+      f.racers[0].velocity.z = carSpeed;
+      awardPowerup(f.racers[0].powerups, power("balloons"), false);
+      f.system.fire(f.racers[0], f.racers);
+      const projectile = f.system.projectiles[0];
+      assert.ok(Math.abs(projectile.body.linvel().z - (85 + carSpeed)) < 0.001);
+      for (let i=0; i<360 && projectile.bounces === 0; i++) {
+        f.physics.step(); f.system.updateProjectiles(1/120, f.racers);
+      }
+      assert.equal(projectile.bounces, 1, "Balloon must still land and bounce");
+      assert.ok(projectile.mesh.position.z > 110 + carSpeed, "Throw should reach distant cars before its first bounce");
+    } finally { f.cleanup(); }
+  }
+});
+
 test("a burst balloon removes its body and temporarily reduces nearby grip", () => {
   const f = fixture();
   awardPowerup(f.racers[0].powerups, power("balloons"), false); f.system.fire(f.racers[0], f.racers);

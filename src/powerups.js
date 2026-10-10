@@ -127,10 +127,11 @@ export class PowerupSystem {
     mesh.position.copy(racer.position).addScaledVector(forward, 12); mesh.position.y += 3;
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward);
     this.group.add(mesh);
-    const projectileSpeed = kind === "balloons" ? 45 : 105;
-    const entity = { mesh, owner: racer, kind, velocity: forward.multiplyScalar(projectileSpeed).add(racer.velocity), life: kind === "shockwave" ? 10 : 5, unique: kind === "shockwave", bounces: 0, previousVy: 18, hitCars: new Set() };
+    const projectileSpeed = kind === "balloons" ? 85 : 105;
+    const launchLift = kind === "balloons" ? 26 : 0;
+    const entity = { mesh, owner: racer, kind, velocity: forward.multiplyScalar(projectileSpeed).add(racer.velocity), life: kind === "shockwave" ? 10 : 5, unique: kind === "shockwave", bounces: 0, previousVy: launchLift, hitCars: new Set() };
     if (kind === "balloons") {
-      entity.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(...mesh.position.toArray()).setLinvel(entity.velocity.x, 18, entity.velocity.z).setCcdEnabled(true));
+      entity.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(...mesh.position.toArray()).setLinvel(entity.velocity.x, launchLift, entity.velocity.z).setCcdEnabled(true));
       this.physics.world.createCollider(RAPIER.ColliderDesc.ball(0.8).setRestitution(0.65).setMass(0.2), entity.body);
     }
     this.projectiles.push(entity);
