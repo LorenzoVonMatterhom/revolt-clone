@@ -14,6 +14,8 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     const failure = await page.locator("#startDescription").textContent();
     if (failure?.startsWith("Could not start game:")) throw new Error(failure);
     console.log(name, "mobile showroom loaded");
+    await page.locator("#menuTrack").selectOption("ship1");
+    await page.waitForFunction(() => window.revoltMap?.id === "ship1" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
     await page.locator("#startBtn").tap();
     await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
     console.log(name, "mobile race started");
@@ -31,5 +33,11 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await fire.tap();
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held !== "firework");
     console.log(name, "Fire button used a power-up; Slide is removed");
+    await page.locator("#menuBtn").tap();
+    await page.locator("#menuTrack").selectOption("ship2");
+    await page.waitForFunction(() => window.revoltMap?.id === "ship2" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
+    await page.locator("#startBtn").tap();
+    await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
+    console.log(name, "Both Toytanic races loaded with pool water");
   } finally { await browser.close(); }
 }

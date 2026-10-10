@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { PoolWater } from "./pool-water.js";
 import { FlexibleAntenna } from "./car-effects.js";
 import { gameAssetUrl } from "./assets.js";
 import { computeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
@@ -230,6 +231,10 @@ export async function loadLevel(level, manifest) {
     model.userData.noCollision = Boolean(instance.flags & 32);
     group.add(model);
   }
+  const objects = parseObjects(objectsBuffer, origin);
+  const water = objects.some(object => object.type === 68)
+    ? new PoolWater(objects, parsePrm(await fetchBuffer("/models/poolwater.m"))) : null;
+  if (water) group.add(water.group);
   group.updateMatrixWorld(true);
   let path = parsePositions(positionsBuffer).map((p) => new THREE.Vector3(...converted(p, origin)));
   if (path.length > 2) {
@@ -237,7 +242,7 @@ export async function loadLevel(level, manifest) {
     path.forEach((p, i) => { if (p.lengthSq() < path[nearest].lengthSq()) nearest = i; });
     path = [...path.slice(nearest), ...path.slice(0, nearest)];
   }
-  return { group, path, aiPath: parseAiPositions(aiBuffer, origin), info, textures, objects: parseObjects(objectsBuffer, origin), stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
+  return { group, path, aiPath: parseAiPositions(aiBuffer, origin), info, textures, objects, water, stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
 }
 
 export function disposeLevel(level) {
