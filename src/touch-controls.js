@@ -14,7 +14,7 @@ export function bindTouchButton(button, code, pointers, enabled) {
   button.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
-export function createTouchControls({ enabled }) {
+export function createTouchControls({ enabled, onFire = () => {} }) {
   const controls = document.createElement("div");
   controls.className = "touch-controls hud";
   controls.setAttribute("role", "group");
@@ -38,6 +38,26 @@ export function createTouchControls({ enabled }) {
     }
     controls.append(group);
   }
+  const pedals = controls.lastElementChild;
+  pedals.classList.add("touch-pedals");
+  const fireButton = document.createElement("button");
+  fireButton.type = "button";
+  fireButton.className = "touch-fire";
+  fireButton.textContent = "Fire";
+  fireButton.setAttribute("aria-label", "Fire power-up");
+  fireButton.disabled = true;
+  pedals.prepend(fireButton);
+  fireButton.addEventListener("pointerdown", (event) => {
+    if (!enabled() || fireButton.disabled || (event.pointerType === "mouse" && event.button !== 0)) return;
+    event.preventDefault();
+    fireButton.setPointerCapture(event.pointerId);
+    fireButton.classList.add("is-pressed");
+    onFire();
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    fireButton.addEventListener(type, () => fireButton.classList.remove("is-pressed"));
+  }
+  fireButton.addEventListener("contextmenu", (event) => event.preventDefault());
   document.querySelector("#game").append(controls);
   function clear() {
     pointers.clear();
@@ -45,5 +65,6 @@ export function createTouchControls({ enabled }) {
   }
   window.addEventListener("blur", clear);
   document.addEventListener("visibilitychange", () => { if (document.hidden) clear(); });
-  return { pressed: (code) => [...pointers.values()].includes(code), clear };
+  return { pressed: (code) => [...pointers.values()].includes(code), clear,
+    setFireEnabled: (available) => { fireButton.disabled = !available; } };
 }
