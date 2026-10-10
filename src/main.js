@@ -1,4 +1,6 @@
 import "./styles.css";
+import "./touch-controls.css";
+import { createTouchControls } from "./touch-controls.js";
 import { gameAssetUrl } from "./assets.js";
 import * as THREE from "three";
 import { LEVELS } from "./levels.js";
@@ -50,6 +52,7 @@ const clock = new THREE.Clock();
 
 const keys = new Map();
 let raceStarted = false;
+const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading });
 let cameraMode = 0;
 let muted = false;
 let elapsedRace = 0;
@@ -503,7 +506,7 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 function openMenu() {
   resetFade?.cancel(); resetBtn.disabled = false;
-  raceStarted = false; keys.clear(); physicsAccumulator = 0;
+  raceStarted = false; keys.clear(); touchControls.clear(); physicsAccumulator = 0;
   startOverlay.classList.remove("hidden");
   document.querySelector("#game").classList.add("menu-open");
   if (sounds.ambience.isPlaying) sounds.ambience.stop();
@@ -532,7 +535,7 @@ async function switchLevel(nextIndex) {
 }
 
 function pressed(code) {
-  return keys.get(code) === true;
+  return keys.get(code) === true || touchControls.pressed(code);
 }
 
 function resetPlayer() {
