@@ -95,6 +95,7 @@ const sounds = {
   hit: new THREE.Audio(listener),
   turbo: new THREE.Audio(listener),
   ambience: new THREE.Audio(listener),
+  carSwitch: new THREE.Audio(listener),
 };
 
 function loadSound(name, url, volume, loop = false) {
@@ -109,6 +110,22 @@ loadSound("pickup", "/wavs/pickup.wav", 0.36);
 loadSound("skid", "/wavs/skid_normal.wav", 0.14, true);
 loadSound("hit", "/wavs/hit1.wav", 0.25);
 loadSound("turbo", "/wavs/turbo.wav", 0.18);
+loadSound("carSwitch", "/wavs/menuleftright.wav", 0.4);
+
+let carSwitchGeneration = 0;
+function playCarSwitchSound() {
+  const generation = ++carSwitchGeneration;
+  const sound = sounds.carSwitch;
+  if (muted || !sound.buffer) return;
+  const play = () => {
+    if (generation !== carSwitchGeneration || muted || raceStarted) return;
+    if (sound.isPlaying) sound.stop();
+    sound.play();
+  };
+  // Selection itself is a user gesture, so menu audio also works on phones.
+  if (listener.context.state === "suspended") listener.context.resume().then(play).catch(console.warn);
+  else if (listener.context.state === "running") play();
+}
 
 function loadAmbience(url) {
   if (sounds.ambience.isPlaying) sounds.ambience.stop();
@@ -475,6 +492,7 @@ for (const [index, car] of showroom.cars.entries()) {
 }
 function selectCar(index) {
   const car = showroom.select(index);
+  if (car.id !== selectedCarId) playCarSwitchSound();
   selectedCarId = car.id; carSelect.value = showroom.selected;
   document.querySelector("#carName").textContent = car.name;
   const stats = document.querySelector("#carStats");
@@ -759,6 +777,7 @@ muteBtn.addEventListener("click", () => {
   muted = !muted;
   muteBtn.textContent = muted ? "Muted" : "Sound";
   if (muted && sounds.skid.isPlaying) sounds.skid.stop();
+  if (muted && sounds.carSwitch.isPlaying) sounds.carSwitch.stop();
   if (muted && sounds.ambience.isPlaying) sounds.ambience.stop();
   if (muted) for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();
   if (!muted && raceStarted && sounds.ambience.buffer && !sounds.ambience.isPlaying) sounds.ambience.play();
