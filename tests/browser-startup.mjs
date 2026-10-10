@@ -19,5 +19,17 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     console.log(name, "mobile race started");
     if (!await page.locator('.touch-controls button[data-code="KeyW"]').isVisible()) throw new Error("Gas button is hidden");
     console.log(name, "touch gas button visible");
+    if (!await page.locator('.touch-controls button[data-code="Space"]').isVisible()) throw new Error("Slide button is hidden");
+    const fire = page.getByRole("button", { name: "Fire power-up", exact: true });
+    if (!await fire.isVisible()) throw new Error("Fire button is hidden");
+    await page.evaluate(() => {
+      const select = document.querySelector("#debugPowerup");
+      select.value = "firework";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held === "firework");
+    await fire.tap();
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held !== "firework");
+    console.log(name, "Fire button used a power-up and Slide is visible");
   } finally { await browser.close(); }
 }
