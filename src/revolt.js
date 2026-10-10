@@ -202,7 +202,7 @@ async function fetchBuffer(url) {
   return response.arrayBuffer();
 }
 
-export async function loadLevel(level, manifest) {
+export async function loadLevel(level, manifest, { collisions = true } = {}) {
   const base = `/levels/${level.id}/${level.id}`;
   const [worldBuffer, instanceBuffer, positionsBuffer, infoResponse, objectsBuffer, aiBuffer] = await Promise.all([fetchBuffer(`${base}.w`), fetchBuffer(`${base}.fin`), manifest.includes(`${base}.pan`) ? fetchBuffer(`${base}.pan`) : Promise.resolve(new ArrayBuffer(0)), fetch(gameAssetUrl(`${base}.inf`)), fetchBuffer(`${base}.fob`), fetchBuffer(`${base}.fan`)]);
   const world = parseWorld(worldBuffer), instances = parseInstances(instanceBuffer);
@@ -217,9 +217,11 @@ export async function loadLevel(level, manifest) {
   const collisionGroup = new THREE.Group();
   collisionGroup.name = "Original track collision";
   collisionGroup.visible = false;
-  collisionGroup.add(collisionMesh(await fetchBuffer(`${base}.ncp`), origin));
-  group.userData.collisionGroup = collisionGroup;
-  group.add(collisionGroup);
+  if (collisions) {
+    collisionGroup.add(collisionMesh(await fetchBuffer(`${base}.ncp`), origin));
+    group.userData.collisionGroup = collisionGroup;
+    group.add(collisionGroup);
+  }
   const models = new Map();
   const resolved = instances.map((instance) => {
     const path = resolveModel(instance.name, files);
@@ -228,7 +230,7 @@ export async function loadLevel(level, manifest) {
   });
   await Promise.all([...new Set(resolved.map((i) => i.path))].map(async (p) => models.set(p, parsePrm(await fetchBuffer(p)))));
   const collisionModels = new Map();
-  await Promise.all([...new Set(resolved.filter(i => !(i.flags & (2 | 32))).map(i => i.path.replace(/\.prm$/i, ".ncp")))].filter(p => files.includes(p)).map(async p => collisionModels.set(p, await fetchBuffer(p))));
+  if (collisions) await Promise.all([...new Set(resolved.filter(i => !(i.flags & (2 | 32))).map(i => i.path.replace(/\.prm$/i, ".ncp")))].filter(p => files.includes(p)).map(async p => collisionModels.set(p, await fetchBuffer(p))));
   for (const instance of resolved) {
     if (instance.flags & 2) continue;
     const model = makeMeshes([models.get(instance.path)], textures, [0, 0, 0], [], instance.flags & 16 ? instance.tint : [1, 1, 1]);
