@@ -96,6 +96,7 @@ const sounds = {
   turbo: new THREE.Audio(listener),
   ambience: new THREE.Audio(listener),
   carSwitch: new THREE.Audio(listener),
+  splash: new THREE.Audio(listener),
 };
 
 function loadSound(name, url, volume, loop = false) {
@@ -111,6 +112,7 @@ loadSound("skid", "/wavs/skid_normal.wav", 0.14, true);
 loadSound("hit", "/wavs/hit1.wav", 0.25);
 loadSound("turbo", "/wavs/turbo.wav", 0.18);
 loadSound("carSwitch", "/wavs/menuleftright.wav", 0.4);
+loadSound("splash", "/wavs/splash.wav", 0.35);
 
 let carSwitchGeneration = 0;
 function playCarSwitchSound() {
@@ -200,7 +202,12 @@ async function buildLevel(level) {
       checkpoints = [];
     }
     physics?.dispose();
-    physics = new MeshPhysics(loaded.group);
+    physics = new MeshPhysics(loaded.group, loaded.water);
+    if (loaded.water) loaded.water.onSplash = () => {
+      if (muted || !raceStarted || !sounds.splash.buffer) return;
+      if (sounds.splash.isPlaying) sounds.splash.stop();
+      sounds.splash.play();
+    };
     skidMarks = new SkidMarks(scene);
     powerups = new PowerupSystem(scene, physics, loaded.group, loaded.objects, powerAssets, playPowerSound);
 
@@ -694,6 +701,7 @@ function animate() {
     throttle: racer.finished ? 0 : racer.throttle,
     airborne: racer.airborne,
   });
+  loadedLevel?.water?.update(dt, racers.map(racer => racer.car));
   for (const racer of racers) racer.mesh.userData.antenna?.update(dt);
   updateCamera(dt);
   updateHud();
