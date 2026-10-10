@@ -3,6 +3,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "src/pool-water.js"
       - "src/physics.js"
       - "src/revolt.js"
       - "tests/**"
@@ -24,4 +25,6 @@ jobs:
         run: node --test tests/antenna.test.js
       - name: Wheel collision regressions
         run: node --test tests/wheel-collisions.test.js
+      - name: Swimming pool water regressions
+        run: node --test tests/water.test.js
       - run: npm test
