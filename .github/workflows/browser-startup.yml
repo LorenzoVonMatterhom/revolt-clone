@@ -1,0 +1,25 @@
+name: Browser Startup Check
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/browser-startup.yml", "tests/browser-startup.mjs"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Check showroom and race startup
+        run: |
+          python3 -m http.server 8000 > /tmp/game-server.log 2>&1 &
+          node tests/browser-startup.mjs
