@@ -393,7 +393,6 @@ class CarController {
       this.bumpCooldown = 0.18;
       if (!muted && raceStarted && sounds.hit.buffer) {
         if (sounds.hit.isPlaying) sounds.hit.stop();
-  if (sounds.scrape.isPlaying) sounds.scrape.stop();
         sounds.hit.setVolume(Math.min(0.65, 0.15 + this.car.impact * 0.025));
         sounds.hit.play();
       }
