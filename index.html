@@ -1739,8 +1739,9 @@ export class MeshPhysics {
     const { vertices, indices } = meshTriangles(group);
     this.triangleCount = indices.length / 3;
     this.bounds = new THREE.Box3().setFromArray(vertices);
-    // One welded trimesh avoids false collisions at material/texture boundaries.
-    this.terrain = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES | RAPIER.TriMeshFlags.ORIENTED).setFriction(0.8).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS));
+    // Weld duplicate vertices, but keep face contacts on authored/open track meshes.
+    // Rapier internal-edge correction suppresses real wall contacts on these meshes.
+    this.terrain = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.MERGE_DUPLICATE_VERTICES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES).setFriction(0.8).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS));
     const obstacleIndices = [];
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
     for (let i = 0; i < indices.length; i += 3) {
@@ -1751,7 +1752,7 @@ export class MeshPhysics {
       if (Math.abs(normal.y) < 0.65) obstacleIndices.push(indices[i], indices[i + 1], indices[i + 2]);
     }
     this.wheelObstacles = obstacleIndices.length ? this.world.createCollider(
-      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(obstacleIndices), RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES)
+      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(obstacleIndices), RAPIER.TriMeshFlags.MERGE_DUPLICATE_VERTICES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES)
         .setFriction(0.05).setRestitution(0).setCollisionGroups(OBSTACLE_GROUPS)
     ) : null;
     this.world.step();
@@ -1876,7 +1877,8 @@ export class MeshPhysics {
     const obstacleContact = contacts.some((hit) => Math.abs(hit.normal1.y) < 0.65);
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).y;
     const stationary = Math.hypot(velocity.x, velocity.z) < 2;
-    car.blockedTime = stationary && (upright < 0.25 || (car.driveIntent && obstacleContact)) ? car.blockedTime + dt : 0;
+    // Pressing an upright car into a wall is a normal collision, not a reset.
+    car.blockedTime = stationary && upright < 0.25 ? car.blockedTime + dt : 0;
     const stacked=cars.some(other=>{
       if(other===car||position.y-other.body.translation().y<1) return false;
       const support=car.collider.contactCollider(other.collider,0.03);
@@ -1902,6 +1904,14 @@ export class MeshPhysics {
     const slippery = traction < 1;
     car.body.setAngularDamping(slippery ? 0.12 : 1.5);
     car.collider?.setFriction(slippery ? 0.015 : 0.3);
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(new THREE.Quaternion().copy(car.body.rotation()));
+    const speed = new THREE.Vector3().copy(car.body.linvel()).dot(forward);
+    // Motor torque falls toward top speed instead of accelerating indefinitely.
+    // Reverse remains slower; do not clamp velocity from slopes or external impacts.
+    const driveSpeed = Math.max(0, speed * Math.sign(throttle));
+    const topSpeed = (throttle < 0 ? 35 : 90) * Math.max(1, Math.abs(throttle));
+    const motorTorque = 1 - THREE.MathUtils.smoothstep(driveSpeed, topSpeed * 0.5, topSpeed);
+    const speedSteering = steeringGain > 1 ? Math.max(0.4, 1 / (1 + (Math.abs(speed) / 55) ** 2)) : 1;
     const totalDriveRatio=car.setup.wheels.reduce((sum,wheel)=>sum+((wheel.powered??true)?(wheel.engineRatio??1):0),0);
     for (let i = 0; i < car.vehicle.numWheels(); i++) {
       const front = car.setup.wheels[i].position.z > 0;
@@ -1909,13 +1919,13 @@ export class MeshPhysics {
       // Give player cars usable lock even when stock ratios are small (Cougar: 0.25).
       const steerRatio = steeringGain > 1 ? Math.max(0.45, wheel.steerRatio ?? 0.45) : (wheel.steerRatio ?? 0.45);
       const steeringLimit = steeringGain > 1 ? 1.05 : 0.8;
-      car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * steerRatio * steeringGain, -steeringLimit, steeringLimit) : 0);
-      car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * 360 * (1 - 0.65 * waterFraction) * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
+      car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * steerRatio * steeringGain * speedSteering, -steeringLimit, steeringLimit) : 0);
+      car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * motorTorque * 360 * (1 - 0.65 * waterFraction) * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
       car.vehicle.setWheelBrake(i, brake * 18 + (handbrake && !front ? 30 : 0));
       car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction * (1 - 0.6 * waterFraction));
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
-    car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
+    car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, TERRAIN_GROUPS, collider => collider.handle === this.terrain.handle);
     car.wheelColliders.forEach((tire, i) => {
       const wheel = car.setup.wheels[i];
       const suspension = car.vehicle.wheelSuspensionLength(i) ?? 0.6;

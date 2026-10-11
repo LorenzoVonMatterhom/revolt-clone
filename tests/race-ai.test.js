@@ -79,7 +79,7 @@ test("stuck recovery does not advance laps and electrical cuts do not trigger re
 
 await initializePhysics();
 const manifest = readdirSync("levels", {recursive:true}).map((path) => `/levels/${path.replaceAll("\\", "/")}`);
-test("an original opponent physically reaches racing speed on a straight", async () => {
+test("an original opponent reaches a bounded cruising speed on a straight", async () => {
   const originalFetch=globalThis.fetch;
   globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
   let physics,mesh;
@@ -94,8 +94,8 @@ test("an original opponent physically reaches racing speed on a straight", async
       const controls=ai.update(1/120,new THREE.Vector3().copy(car.body.translation()),Math.atan2(forward.x,forward.z),new THREE.Vector3().copy(car.body.linvel()));
       physics.updateVehicle(car,1/120,controls.throttle,controls.brake,controls.steering,false);physics.step();
     }
-    assert.ok(car.body.linvel().z>145,`Actual opponent speed: ${car.body.linvel().z}`);
-    assert.ok(car.body.translation().z>1000);
+    assert.ok(car.body.linvel().z>60&&car.body.linvel().z<95,`Actual opponent speed: ${car.body.linvel().z}`);
+    assert.ok(car.body.translation().z>600,`Opponent must keep making progress: ${car.body.translation().z}`);
   } finally {
     globalThis.fetch=originalFetch;physics?.dispose();mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
   }
