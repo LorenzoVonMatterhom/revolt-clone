@@ -116,7 +116,7 @@ export class MeshPhysics {
         .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60);
       return this.world.createCollider(tire, body);
     });
-    const car = { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0 };
+    const car = { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
     for (const shape of [collider, ...wheelColliders]) this.impactCars.set(shape.handle, car);
     return car;
   }
@@ -162,7 +162,7 @@ export class MeshPhysics {
         car.body.setLinvel({ x: 0, y: 0, z: 0 }, true); car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         this.world.propagateModifiedBodyPositionsToColliders();
         car.safePose = { position: position.clone(), rotation: new THREE.Quaternion().copy(rotation) };
-        car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0; car.impact=0;
+        car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0; car.impact=0; car.scrape=0;
         return true;
       }
     }
@@ -252,6 +252,28 @@ export class MeshPhysics {
         if (car) car.impact = Math.max(car.impact, event.totalForceMagnitude() * this.world.timestep / Math.max(1, car.body.mass()));
       }
     });
+    // Only solid chassis contact counts: suspension and ordinary tire grip are quiet.
+    for (const car of new Set(this.impactCars.values())) {
+      car.scrape = 0;
+      this.world.contactPairsWith(car.collider, other => {
+        this.world.contactPair(car.collider, other, (manifold, flipped) => {
+          const normal = new THREE.Vector3().copy(manifold.normal());
+          for (let i = 0; i < manifold.numContacts(); i++) {
+            if (manifold.contactDist(i) > 0.025) continue;
+            const localPoint = flipped ? manifold.localContactPoint2(i) : manifold.localContactPoint1(i);
+            if (!localPoint) continue;
+            const point = new THREE.Vector3().copy(localPoint)
+              .applyQuaternion(new THREE.Quaternion().copy(car.collider.rotation()))
+              .add(new THREE.Vector3().copy(car.collider.translation()));
+            const velocity = new THREE.Vector3().copy(car.body.velocityAtPoint(point));
+            const otherBody = other.parent();
+            if (otherBody) velocity.sub(new THREE.Vector3().copy(otherBody.velocityAtPoint(point)));
+            velocity.addScaledVector(normal, -velocity.dot(normal));
+            car.scrape = Math.max(car.scrape, velocity.length());
+          }
+        });
+      });
+    }
   }
   dispose() { this.events.free(); this.impactCars.clear(); this.world.free(); }
 }
