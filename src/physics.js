@@ -48,6 +48,8 @@ const OBSTACLE_GROUPS = (2 << 16) | 2;
 export class MeshPhysics {
   constructor(group, water = null) {
     this.water = water;
+    this.events = new RAPIER.EventQueue(false);
+    this.impactCars = new Map();
     this.world = new RAPIER.World({ x: 0, y: -42, z: 0 });
     this.world.timestep = 1 / 120;
     this.world.integrationParameters.numSolverIterations = 8;
@@ -86,7 +88,7 @@ export class MeshPhysics {
     const hull = setup.bodyVertices?.length >= 12 ? RAPIER.ColliderDesc.convexHull(setup.bodyVertices) : null;
     const shapeOffset = hull ? new THREE.Vector3() : center.clone();
     const descriptor = hull ?? RAPIER.ColliderDesc.cuboid(size.x, size.y, size.z).setTranslation(center.x, center.y, center.z);
-    const collider = this.world.createCollider(descriptor.setMass(8).setFriction(0.3).setRestitution(0.02).setContactSkin(0.02).setCollisionGroups(CHASSIS_GROUPS), body);
+    const collider = this.world.createCollider(descriptor.setMass(8).setFriction(0.3).setRestitution(0.02).setContactSkin(0.02).setCollisionGroups(CHASSIS_GROUPS).setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60), body);
     const vehicle = this.world.createVehicleController(body);
     vehicle.indexUpAxis = 1;
     vehicle.setIndexForwardAxis = 2;
@@ -110,10 +112,19 @@ export class MeshPhysics {
       const tire = RAPIER.ColliderDesc.roundCylinder(halfWidth, radius, Math.min(0.05, radius * 0.1))
         .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))
         .setTranslation(wheel.position.x, wheel.position.y, wheel.position.z)
-        .setMass(0).setFriction(0.05).setRestitution(0).setContactSkin(0.01).setCollisionGroups(TIRE_GROUPS);
+        .setMass(0).setFriction(0.05).setRestitution(0).setContactSkin(0.01).setCollisionGroups(TIRE_GROUPS)
+        .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60);
       return this.world.createCollider(tire, body);
     });
-    return { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false };
+    const car = { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0 };
+    for (const shape of [collider, ...wheelColliders]) this.impactCars.set(shape.handle, car);
+    return car;
+  }
+
+  removeCar(car) {
+    for (const shape of [car.collider, ...car.wheelColliders]) this.impactCars.delete(shape.handle);
+    this.world.removeVehicleController(car.vehicle);
+    this.world.removeRigidBody(car.body);
   }
 
   overlapsCar(car, position, rotation) {
@@ -151,7 +162,7 @@ export class MeshPhysics {
         car.body.setLinvel({ x: 0, y: 0, z: 0 }, true); car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         this.world.propagateModifiedBodyPositionsToColliders();
         car.safePose = { position: position.clone(), rotation: new THREE.Quaternion().copy(rotation) };
-        car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0;
+        car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0; car.impact=0;
         return true;
       }
     }
@@ -232,6 +243,15 @@ export class MeshPhysics {
     });
   }
 
-  step() { this.world.step(); }
-  dispose() { this.world.free(); }
+  step() {
+    for (const car of this.impactCars.values()) car.impact = 0;
+    this.world.step(this.events);
+    this.events.drainContactForceEvents(event => {
+      for (const handle of [event.collider1(), event.collider2()]) {
+        const car = this.impactCars.get(handle);
+        if (car) car.impact = Math.max(car.impact, event.totalForceMagnitude() * this.world.timestep / Math.max(1, car.body.mass()));
+      }
+    });
+  }
+  dispose() { this.events.free(); this.impactCars.clear(); this.world.free(); }
 }

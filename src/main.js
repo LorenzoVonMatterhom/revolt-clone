@@ -383,6 +383,14 @@ class CarController {
     this.position.copy(this.car.body.translation());
     this.mesh.quaternion.copy(this.car.body.rotation());
     this.velocity.copy(this.car.body.linvel());
+    if (this.isPlayer && this.car.impact > 1.5 && this.bumpCooldown === 0) {
+      this.bumpCooldown = 0.18;
+      if (!muted && raceStarted && sounds.hit.buffer) {
+        if (sounds.hit.isPlaying) sounds.hit.stop();
+        sounds.hit.setVolume(Math.min(0.65, 0.15 + this.car.impact * 0.025));
+        sounds.hit.play();
+      }
+    }
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
     this.heading = Math.atan2(forward.x, forward.z);
     this.airborne = true;
@@ -536,6 +544,7 @@ function openMenu() {
   document.querySelector("#game").classList.add("menu-open");
   if (sounds.ambience.isPlaying) sounds.ambience.stop();
   if (sounds.skid.isPlaying) sounds.skid.stop();
+  if (sounds.hit.isPlaying) sounds.hit.stop();
   for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();
 }
 document.querySelector("#menuBtn").addEventListener("click", openMenu);
@@ -748,8 +757,7 @@ startBtn.addEventListener("click", async () => {
       const choice = showroom.cars.find((car) => car.id === selectedCarId);
       const mesh = await makeCar(choice.id, choice.name);
       scene.remove(player.mesh);
-      physics.world.removeVehicleController(player.car.vehicle);
-      physics.world.removeRigidBody(player.car.body);
+      physics.removeCar(player.car);
       player.mesh.userData.engine.audio.disconnect();
       player.mesh.traverse((o) => { o.geometry?.dispose(); if (o.material) { o.material.map?.dispose(); o.material.dispose(); } });
       racers[0] = player = new CarController(mesh, { isPlayer: true, startOffset: -3.3 });
@@ -787,6 +795,7 @@ muteBtn.addEventListener("click", () => {
   muted = !muted;
   muteBtn.textContent = muted ? "Muted" : "Sound";
   if (muted && sounds.skid.isPlaying) sounds.skid.stop();
+  if (muted && sounds.hit.isPlaying) sounds.hit.stop();
   if (muted && sounds.carSwitch.isPlaying) sounds.carSwitch.stop();
   if (muted && sounds.ambience.isPlaying) sounds.ambience.stop();
   if (muted) for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();
