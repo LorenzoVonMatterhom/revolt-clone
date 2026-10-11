@@ -65,3 +65,34 @@ test("a fast sideways tire collision stops the wheels before the chassis reaches
     assert.ok(Number.isFinite(car.body.translation().y));
   } finally { physics.dispose(); }
 });
+
+test("real chassis impacts emit strength while parked contacts and free movement stay quiet", () => {
+  const physics = new MeshPhysics(scene(4));
+  try {
+    const car = physics.createCar(carMesh());
+    car.body.setTranslation({x:0,y:1,z:0},true);
+    for (let i=0;i<240;i++) { physics.updateVehicle(car,1/120,0,0,0,false); physics.step(); }
+    assert.ok(car.impact < 1.5,"Resting suspension must not sound like a crash");
+    car.body.setLinvel({x:35,y:0,z:0},true);
+    let strongest = 0;
+    for (let i=0;i<120;i++) { physics.updateVehicle(car,1/120,0,0,0,false); physics.step(); strongest=Math.max(strongest,car.impact); }
+    assert.ok(strongest>1.5,"A real wall impact must trigger sound strength");
+    for (let i=0;i<240;i++) { physics.updateVehicle(car,1/120,0,0,0,false); physics.step(); }
+    assert.ok(car.impact < 1.5,"A stopped car pressed against a wall must stop sounding");
+    physics.removeCar(car);
+    assert.equal(physics.impactCars.size,0,"Changing cars must remove stale impact listeners");
+    assert.equal(physics.world.bodies.len(),0);
+  } finally { physics.dispose(); }
+});
+
+test("a hard chassis landing produces an impact event", () => {
+  const physics = new MeshPhysics(scene());
+  try {
+    const car = physics.createCar(carMesh());
+    car.body.setTranslation({x:0,y:8,z:0},true);
+    car.body.setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI),true);
+    let strongest=0;
+    for (let i=0;i<240;i++) { physics.updateVehicle(car,1/120,0,0,0,false); physics.step(); strongest=Math.max(strongest,car.impact); }
+    assert.ok(strongest>1.5,"Landing on the chassis must trigger an impact sound");
+  } finally { physics.dispose(); }
+});
