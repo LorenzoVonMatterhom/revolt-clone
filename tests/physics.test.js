@@ -339,3 +339,51 @@ test("original RC Bandit rests on actual neighborhood mesh triangles", async () 
     physics?.dispose(); disposeLevel(level); globalThis.fetch = realFetch;
   }
 });
+
+test("an upright car stays at a wall under throttle and can back away without teleporting", () => {
+  const ground=new THREE.Group();box(ground,[300,1,300],[0,-.5,0]);box(ground,[100,8,.2],[0,4,12]);
+  const physics=new MeshPhysics(ground),car=physics.createCar(carMesh());
+  try {
+    assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()));
+    let resets=0;
+    for(let i=0;i<720;i++) {
+      physics.updateVehicle(car,1/120,1,0,0,false);physics.step();
+      const before=new THREE.Vector3().copy(car.body.translation());physics.checkCar(car,1/120);
+      if(before.distanceTo(car.body.translation())>1)resets++;
+    }
+    assert.equal(resets,0,'Holding throttle into a solid wall must not teleport the car');
+    assert.ok(car.body.translation().z<11,'The thin wall must remain solid');
+    const wallPosition=car.body.translation().z;
+    for(let i=0;i<240;i++){physics.updateVehicle(car,1/120,-1,0,0,false);physics.step();physics.checkCar(car,1/120);}
+    assert.ok(car.body.translation().z<wallPosition-8,'Reverse must release contact');
+  }finally{physics.dispose();}
+});
+
+test("sustained throttle reaches a stable speed and reverse remains slower", () => {
+  const ground=new THREE.Group();box(ground,[10000,1,10000],[0,-.5,0]);
+  const physics=new MeshPhysics(ground),car=physics.createCar(carMesh());
+  try {
+    physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion());
+    for(let i=0;i<1440;i++){physics.updateVehicle(car,1/120,1,0,0,false);physics.step();}
+    const forwardSpeed=car.body.linvel().z;
+    assert.ok(forwardSpeed>60&&forwardSpeed<95,`Motor must settle instead of accelerating forever: ${forwardSpeed}`);
+    for(let i=0;i<1440;i++){physics.updateVehicle(car,1/120,-1,0,0,false);physics.step();}
+    const reverseSpeed=-car.body.linvel().z;
+    assert.ok(reverseSpeed>20&&reverseSpeed<40,`Reverse must be controllable: ${reverseSpeed}`);
+  }finally{physics.dispose();}
+});
+
+test("crossing joined road triangles does not launch the chassis", () => {
+  const ground=new THREE.Group();
+  const road=new THREE.Mesh(new THREE.PlaneGeometry(100,400,10,100).toNonIndexed());
+  road.rotation.x=-Math.PI/2;road.position.z=180;ground.add(road);
+  const physics=new MeshPhysics(ground),car=physics.createCar(carMesh());
+  try {
+    physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion());
+    for(let i=0;i<240;i++){physics.updateVehicle(car,1/120,0,0,0,false);physics.step();}
+    const restingY=car.body.translation().y;let maxY=restingY;
+    for(let i=0;i<480;i++){physics.updateVehicle(car,1/120,.5,0,0,false);physics.step();maxY=Math.max(maxY,car.body.translation().y);}
+    assert.ok(car.body.translation().z>50,'Drive must cross many triangle seams');
+    assert.ok(maxY<restingY+.25,`Road seams must not launch the car: ${maxY-restingY}`);
+  }finally{physics.dispose();}
+});

@@ -82,3 +82,31 @@ test("original tracks use authored collision rather than all decorative render p
     }
   } finally { globalThis.fetch=realFetch; }
 });
+
+test("Cougar's native neighborhood wall contact stays solid without repeated penetration resets", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => new Response(readFileSync(String(url).slice(1)));
+  const manifest = readdirSync('levels', {recursive:true}).map(path=>'/levels/'+path.replaceAll('\\','/'));
+  let level,physics,mesh;
+  try {
+    level=await loadLevel({id:'nhood1'},manifest);
+    physics=new MeshPhysics(level.group);
+    mesh=await loadCar('cougar','Cougar');const car=physics.createCar(mesh);
+    assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),level.info.STARTROT[0]*Math.PI*2)));
+    let deepFrames=0,resets=0,impacts=0;
+    for(let i=0;i<720;i++) {
+      physics.updateVehicle(car,1/120,1,0,.2,false,1,2.1);physics.step();
+      const before=new THREE.Vector3().copy(car.body.translation());
+      physics.checkCar(car,1/120);
+      if(before.distanceTo(car.body.translation())>2)resets++;
+      if(car.embeddedTime>0)deepFrames++;
+      if(car.impact>1.5)impacts++;
+    }
+    assert.ok(impacts>0,'The drive must actually hit the native wall');
+    assert.equal(resets,0,'A solid wall must stop the car instead of penetration/reset loops');
+    assert.ok(deepFrames<12,`Wall penetration must not persist: ${deepFrames} frames`);
+    const stuckAt=new THREE.Vector3().copy(car.body.translation());
+    for(let i=0;i<240;i++){physics.updateVehicle(car,1/120,-1,0,0,false,1,2.1);physics.step();physics.checkCar(car,1/120);}
+    assert.ok(stuckAt.distanceTo(car.body.translation())>8,'Reverse must free the car from the wall');
+  } finally {physics?.dispose();disposeLevel(level);globalThis.fetch=realFetch;mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
+});
