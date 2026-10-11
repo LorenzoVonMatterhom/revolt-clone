@@ -93,6 +93,7 @@ const sounds = {
   pickup: new THREE.Audio(listener),
   skid: new THREE.Audio(listener),
   hit: new THREE.Audio(listener),
+  scrape: new THREE.Audio(listener),
   turbo: new THREE.Audio(listener),
   ambience: new THREE.Audio(listener),
   carSwitch: new THREE.Audio(listener),
@@ -110,6 +111,7 @@ function loadSound(name, url, volume, loop = false) {
 loadSound("pickup", "/wavs/pickup.wav", 0.36);
 loadSound("skid", "/wavs/skid_normal.wav", 0.14, true);
 loadSound("hit", "/wavs/hit1.wav", 0.25);
+loadSound("scrape", "/wavs/scrape.wav", 0.2, true);
 loadSound("turbo", "/wavs/turbo.wav", 0.18);
 loadSound("carSwitch", "/wavs/menuleftright.wav", 0.4);
 loadSound("splash", "/wavs/splash.wav", 0.35);
@@ -296,6 +298,10 @@ class CarController {
   }
 
   resetTo(index, offset = 0, gridRow = 0) {
+    if (this.isPlayer) {
+      this.scrapeHold = 0;
+      if (sounds.scrape.isPlaying) sounds.scrape.stop();
+    }
     skidMarks?.previous.delete(this);
     this.sliding = false;
     if (this.physics !== physics) {
@@ -387,9 +393,17 @@ class CarController {
       this.bumpCooldown = 0.18;
       if (!muted && raceStarted && sounds.hit.buffer) {
         if (sounds.hit.isPlaying) sounds.hit.stop();
+  if (sounds.scrape.isPlaying) sounds.scrape.stop();
         sounds.hit.setVolume(Math.min(0.65, 0.15 + this.car.impact * 0.025));
         sounds.hit.play();
       }
+    }
+    if (this.isPlayer) {
+      this.scrapeHold = this.car.scrape > 1 ? 0.08 : Math.max(0, (this.scrapeHold ?? 0) - PHYSICS_STEP);
+      if (!muted && raceStarted && this.scrapeHold > 0 && sounds.scrape.buffer) {
+        sounds.scrape.setVolume(Math.min(0.5, 0.08 + this.car.scrape * 0.015));
+        if (!sounds.scrape.isPlaying) sounds.scrape.play();
+      } else if (sounds.scrape.isPlaying) sounds.scrape.stop();
     }
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
     this.heading = Math.atan2(forward.x, forward.z);
@@ -545,6 +559,7 @@ function openMenu() {
   if (sounds.ambience.isPlaying) sounds.ambience.stop();
   if (sounds.skid.isPlaying) sounds.skid.stop();
   if (sounds.hit.isPlaying) sounds.hit.stop();
+  if (sounds.scrape.isPlaying) sounds.scrape.stop();
   for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();
 }
 document.querySelector("#menuBtn").addEventListener("click", openMenu);
@@ -796,6 +811,7 @@ muteBtn.addEventListener("click", () => {
   muteBtn.textContent = muted ? "Muted" : "Sound";
   if (muted && sounds.skid.isPlaying) sounds.skid.stop();
   if (muted && sounds.hit.isPlaying) sounds.hit.stop();
+  if (muted && sounds.scrape.isPlaying) sounds.scrape.stop();
   if (muted && sounds.carSwitch.isPlaying) sounds.carSwitch.stop();
   if (muted && sounds.ambience.isPlaying) sounds.ambience.stop();
   if (muted) for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();

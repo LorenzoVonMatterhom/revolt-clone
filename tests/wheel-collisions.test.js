@@ -96,3 +96,28 @@ test("a hard chassis landing produces an impact event", () => {
     assert.ok(strongest>1.5,"Landing on the chassis must trigger an impact sound");
   } finally { physics.dispose(); }
 });
+
+test("chassis sliding on a surface reports scraping, then stops when stationary or separated", () => {
+  const physics = new MeshPhysics(scene());
+  try {
+    const car = physics.createCar(carMesh());
+    car.body.setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI),true);
+    car.body.setEnabledRotations(false,false,false,true);
+    car.body.setTranslation({x:0,y:1.4,z:0},true);
+    let scrapingSteps=0;
+    for (let i=0;i<120;i++) {
+      car.body.setLinvel({x:12,y:car.body.linvel().y,z:0},true);
+      physics.step();
+      if(car.scrape>1) scrapingSteps++;
+    }
+    assert.ok(scrapingSteps>30,"Sliding chassis contact must sustain the scrape signal");
+    car.body.setLinvel({x:0,y:0,z:0},true);
+    car.body.setAngvel({x:0,y:0,z:0},true);
+    for(let i=0;i<120;i++)physics.step();
+    assert.ok(car.scrape<1,"Stationary surface contact must be quiet");
+    car.body.setTranslation({x:0,y:20,z:0},true);
+    car.body.setLinvel({x:12,y:0,z:0},true);
+    physics.step();
+    assert.equal(car.scrape,0,"Motion without contact must be quiet");
+  } finally { physics.dispose(); }
+});
