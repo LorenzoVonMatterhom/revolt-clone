@@ -94,8 +94,8 @@ test("an original opponent reaches a bounded cruising speed on a straight", asyn
       const controls=ai.update(1/120,new THREE.Vector3().copy(car.body.translation()),Math.atan2(forward.x,forward.z),new THREE.Vector3().copy(car.body.linvel()));
       physics.updateVehicle(car,1/120,controls.throttle,controls.brake,controls.steering,false);physics.step();
     }
-    assert.ok(car.body.linvel().z>60&&car.body.linvel().z<95,`Actual opponent speed: ${car.body.linvel().z}`);
-    assert.ok(car.body.translation().z>600,`Opponent must keep making progress: ${car.body.translation().z}`);
+    assert.ok(car.body.linvel().z>120&&car.body.linvel().z<190,`Actual opponent speed: ${car.body.linvel().z}`);
+    assert.ok(car.body.translation().z>1200,`Opponent must keep making progress: ${car.body.translation().z}`);
   } finally {
     globalThis.fetch=originalFetch;physics?.dispose();mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
   }
