@@ -88,8 +88,8 @@ test("an original opponent reaches a bounded cruising speed on a straight", asyn
     const floor=new THREE.Mesh(new THREE.BoxGeometry(500,1,6000));floor.position.y=-0.5;ground.add(floor);
     physics=new MeshPhysics(ground);mesh=await loadCar("volken","Volken Turbo");
     const car=physics.createCar(mesh);car.body.setTranslation({x:0,y:0.8,z:0},true);
-    const ai=new RaceAI([new THREE.Vector3(),new THREE.Vector3(0,0,2000),new THREE.Vector3(1000,0,2000),new THREE.Vector3(1000,0,0)],0.92,car.setup);
-    for(let frame=0;frame<1200;frame++) {
+    const ai=new RaceAI([new THREE.Vector3(),new THREE.Vector3(0,0,4000),new THREE.Vector3(1000,0,4000),new THREE.Vector3(1000,0,0)],0.92,car.setup);
+    for(let frame=0;frame<1440;frame++) {
       const rotation=car.body.rotation(),forward=new THREE.Vector3(0,0,1).applyQuaternion(rotation);
       const controls=ai.update(1/120,new THREE.Vector3().copy(car.body.translation()),Math.atan2(forward.x,forward.z),new THREE.Vector3().copy(car.body.linvel()));
       physics.updateVehicle(car,1/120,controls.throttle,controls.brake,controls.steering,false);physics.step();

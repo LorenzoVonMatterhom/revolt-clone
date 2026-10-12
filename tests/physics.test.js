@@ -367,6 +367,7 @@ test("sustained throttle reaches a stable speed and reverse remains slower", () 
     for(let i=0;i<1440;i++){physics.updateVehicle(car,1/120,1,0,0,false);physics.step();}
     const forwardSpeed=car.body.linvel().z;
     assert.ok(forwardSpeed>120&&forwardSpeed<190,`Motor must settle instead of accelerating forever: ${forwardSpeed}`);
+    assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()),'Measure reverse speed from a clear standstill');
     for(let i=0;i<1440;i++){physics.updateVehicle(car,1/120,-1,0,0,false);physics.step();}
     const reverseSpeed=-car.body.linvel().z;
     assert.ok(reverseSpeed>40&&reverseSpeed<80,`Reverse must be controllable: ${reverseSpeed}`);
