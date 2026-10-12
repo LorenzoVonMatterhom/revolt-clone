@@ -233,7 +233,7 @@ test("two-wheel and four-wheel drive receive equal total engine force, split by 
     const mesh=carMesh();mesh.userData.physics.wheels.forEach((wheel,i)=>{wheel.powered=powered[i];wheel.engineRatio=i<2?2:1;});
     const car=physics.createCar(mesh);physics.updateVehicle(car,1/120,1,0,0,false);
     const force=mesh.userData.physics.wheels.reduce((sum,wheel,i)=>sum+car.vehicle.wheelEngineForce(i),0);
-    assert.ok(Math.abs(force-360)<0.0001);
+    assert.ok(Math.abs(force-720)<0.0001);
     powered.forEach((value,i)=>{if(!value)assert.equal(car.vehicle.wheelEngineForce(i),0);});
   }
   physics.dispose();
@@ -366,10 +366,11 @@ test("sustained throttle reaches a stable speed and reverse remains slower", () 
     physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion());
     for(let i=0;i<1440;i++){physics.updateVehicle(car,1/120,1,0,0,false);physics.step();}
     const forwardSpeed=car.body.linvel().z;
-    assert.ok(forwardSpeed>60&&forwardSpeed<95,`Motor must settle instead of accelerating forever: ${forwardSpeed}`);
+    assert.ok(forwardSpeed>120&&forwardSpeed<190,`Motor must settle instead of accelerating forever: ${forwardSpeed}`);
+    assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()),'Measure reverse speed from a clear standstill');
     for(let i=0;i<1440;i++){physics.updateVehicle(car,1/120,-1,0,0,false);physics.step();}
     const reverseSpeed=-car.body.linvel().z;
-    assert.ok(reverseSpeed>20&&reverseSpeed<40,`Reverse must be controllable: ${reverseSpeed}`);
+    assert.ok(reverseSpeed>40&&reverseSpeed<80,`Reverse must be controllable: ${reverseSpeed}`);
   }finally{physics.dispose();}
 });
 
