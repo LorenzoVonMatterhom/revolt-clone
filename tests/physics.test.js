@@ -388,3 +388,16 @@ test("crossing joined road triangles does not launch the chassis", () => {
     assert.ok(maxY<restingY+.25,`Road seams must not launch the car: ${maxY-restingY}`);
   }finally{physics.dispose();}
 });
+
+test("a wall-only collision mesh remains solid without creating a road or suspension support", () => {
+  const group=new THREE.Group();box(group,[.2,8,100],[4,4,0]);
+  const physics=new MeshPhysics(group),car=physics.createCar(carMesh());
+  try {
+    assert.equal(physics.groundAt({x:0,y:4,z:0}),null);
+    car.body.setTranslation({x:0,y:4,z:0},true);
+    car.body.setLinvel({x:80,y:0,z:0},true);
+    for(let i=0;i<12;i++){physics.updateVehicle(car,1/120,0,0,0,false);physics.step();}
+    assert.ok(car.body.translation().x<3,'Tires must stop at the real wall');
+    assert.ok(car.body.linvel().y<0,'Walls must not act as suspension ground');
+  }finally{physics.dispose();}
+});

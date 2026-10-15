@@ -110,3 +110,43 @@ test("Cougar's native neighborhood wall contact stays solid without repeated pen
     assert.ok(stuckAt.distanceTo(car.body.translation())>8,'Reverse must free the car from the wall');
   } finally {physics?.dispose();disposeLevel(level);globalThis.fetch=realFetch;mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
 });
+
+test("original chassis slide across flat and banked triangle seams without being launched", async () => {
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  try {
+    for(const slope of [0,0.2])for(const upsideDown of [false,true])for(const id of ['rc','cougar']) {
+      const group=new THREE.Group(),vertices=[];
+      // Independently reconstructed face corners differ by NCP rounding noise.
+      for(let x=-10;x<10;x++)for(let z=-10;z<50;z++) {
+        const noise=((x+z)%2)*0.00002;
+        const a=[x*4,x*4*slope,-z*4],b=[(x+1)*4+noise,(x+1)*4*slope,-z*4];
+        const c=[(x+1)*4,(x+1)*4*slope,-(z+1)*4],d=[x*4+noise,x*4*slope,-(z+1)*4];
+        vertices.push(...a,...b,...c,...a,...c,...d);
+      }
+      const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+      group.add(new THREE.Mesh(geometry));
+      const physics=new MeshPhysics(group),mesh=await loadCar(id,id);
+      try {
+        const car=physics.createCar(mesh);
+        const startHeight=upsideDown?car.setup.center.y+car.setup.halfExtents.y:0.3;
+        car.body.setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),upsideDown?Math.PI:0),true);
+        car.body.setTranslation({x:0,y:startHeight,z:0},true);
+        car.body.setLinvel({x:0,y:0,z:-100},true);
+        let maxRise=0,maxUpwardSpeed=0;
+        for(let i=0;i<180;i++) {
+          physics.step();
+          maxRise=Math.max(maxRise,car.body.translation().y-startHeight);
+          maxUpwardSpeed=Math.max(maxUpwardSpeed,car.body.linvel().y);
+        }
+        const label=`${id}, bank ${slope}, inverted ${upsideDown}`;
+        assert.ok(maxRise<0.25,`${label}: seam launched the chassis ${maxRise} units`);
+        assert.ok(maxUpwardSpeed<3,`${label}: seam imparted upward speed ${maxUpwardSpeed}`);
+        assert.ok(car.body.translation().z < -80,`${label}: chassis snagged on a seam`);
+      }finally{
+        physics.dispose();geometry.dispose();
+        mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
+      }
+    }
+  }finally{globalThis.fetch=realFetch;}
+});
