@@ -43,7 +43,7 @@ export function meshTriangles(group) {
 const CHASSIS_GROUPS = (1 << 16) | 3;
 const TERRAIN_GROUPS = (1 << 16) | 1;
 const TIRE_GROUPS = (2 << 16) | 3;
-const OBSTACLE_GROUPS = (2 << 16) | 2;
+const OBSTACLE_GROUPS = (2 << 16) | 3;
 
 export class MeshPhysics {
   constructor(group, water = null) {
@@ -57,20 +57,28 @@ export class MeshPhysics {
     const { vertices, indices } = meshTriangles(group);
     this.triangleCount = indices.length / 3;
     this.bounds = new THREE.Box3().setFromArray(vertices);
-    // Weld duplicate vertices, but keep face contacts on authored/open track meshes.
-    // Rapier internal-edge correction suppresses real wall contacts on these meshes.
-    this.terrain = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.MERGE_DUPLICATE_VERTICES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES).setFriction(0.8).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS));
-    const obstacleIndices = [];
+    // NCP plane intersections can produce slightly different coordinates for a
+    // shared corner. Snap collision vertices only, so adjacent faces really weld.
+    for (let i = 0; i < vertices.length; i++) vertices[i] = Math.round(vertices[i] * 10000) / 10000;
+    const roadIndices = [], obstacleIndices = [];
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
     for (let i = 0; i < indices.length; i += 3) {
       a.fromArray(vertices, indices[i] * 3);
       b.fromArray(vertices, indices[i + 1] * 3).sub(a);
       c.fromArray(vertices, indices[i + 2] * 3).sub(a);
       const normal = b.cross(c).normalize();
-      if (Math.abs(normal.y) < 0.65) obstacleIndices.push(indices[i], indices[i + 1], indices[i + 2]);
+      const target = Math.abs(normal.y) < 0.65 ? obstacleIndices : roadIndices;
+      target.push(indices[i], indices[i + 1], indices[i + 2]);
     }
+    const meshFlags = RAPIER.TriMeshFlags.MERGE_DUPLICATE_VERTICES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES;
+    // Smooth shared road edges without letting correction suppress upright walls.
+    this.terrain = roadIndices.length ? this.world.createCollider(
+      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(roadIndices), meshFlags | RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES_TWO_SIDED)
+        .setFriction(0.8).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS)
+    ) : null;
+    // Chassis and tires share the wall mesh; walls no longer also belong to road.
     this.wheelObstacles = obstacleIndices.length ? this.world.createCollider(
-      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(obstacleIndices), RAPIER.TriMeshFlags.MERGE_DUPLICATE_VERTICES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES)
+      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(obstacleIndices), meshFlags)
         .setFriction(0.05).setRestitution(0).setCollisionGroups(OBSTACLE_GROUPS)
     ) : null;
     this.world.step();
@@ -131,7 +139,7 @@ export class MeshPhysics {
   overlapsCar(car, position, rotation) {
     const center = car.shapeOffset.clone().applyQuaternion(rotation).add(position);
     const bodyCenter = car.setup.center.clone().applyQuaternion(rotation).add(position);
-    if (this.terrain.projectPoint(bodyCenter, true).isInside) return true;
+    if (this.terrain?.projectPoint(bodyCenter, true).isInside) return true;
     const size=car.setup.halfExtents;
     const bottom=position.y-1,top=bodyCenter.y+size.y+0.05;
     const clearanceCenter=new THREE.Vector3(bodyCenter.x,(bottom+top)/2,bodyCenter.z);
@@ -187,9 +195,10 @@ export class MeshPhysics {
       if (car.safePose) this.placeCar(car, car.safePose.position, car.safePose.rotation);
       return;
     }
+    const roadContact = this.terrain ? car.collider.contactCollider(this.terrain, 0) : null;
     const contacts = [
-      car.collider.contactCollider(this.terrain, 0),
-      ...(this.wheelObstacles ? car.wheelColliders.map((tire) => tire.contactCollider(this.wheelObstacles, 0)) : []),
+      roadContact,
+      ...(this.wheelObstacles ? [car.collider, ...car.wheelColliders].map((shape) => shape.contactCollider(this.wheelObstacles, 0)) : []),
     ].filter(Boolean);
     const contact = contacts.find((hit) => hit.distance < -0.2) ?? contacts[0];
     const obstacleContact = contacts.some((hit) => Math.abs(hit.normal1.y) < 0.65);
@@ -204,14 +213,14 @@ export class MeshPhysics {
     });
     car.stackedTime=stacked?car.stackedTime+dt:0;
     const bodyCenter = car.setup.center.clone().applyQuaternion(rotation).add(position);
-    const deeplyEmbedded = (contact && contact.distance < -0.2) || this.terrain.projectPoint(bodyCenter, true).isInside;
+    const deeplyEmbedded = (contact && contact.distance < -0.2) || this.terrain?.projectPoint(bodyCenter, true).isInside;
     car.embeddedTime = deeplyEmbedded ? car.embeddedTime + dt : 0;
     if ((car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
       this.placeCar(car, car.safePose.position, car.safePose.rotation);
       return;
     }
     // Keep a previously clear resting pose, not the latest position pressed into a wall.
-    if (!car.collider.contactCollider(this.terrain, 0) && !obstacleContact && !deeplyEmbedded && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {
+    if (!roadContact && !obstacleContact && !deeplyEmbedded && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {
       car.safePose = { position, rotation };
     }
   }
@@ -244,7 +253,7 @@ export class MeshPhysics {
       car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction * (1 - 0.6 * waterFraction));
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
-    car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, TERRAIN_GROUPS, collider => collider.handle === this.terrain.handle);
+    car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, TERRAIN_GROUPS, collider => collider.handle === this.terrain?.handle);
     car.wheelColliders.forEach((tire, i) => {
       const wheel = car.setup.wheels[i];
       const suspension = car.vehicle.wheelSuspensionLength(i) ?? 0.6;
