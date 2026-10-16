@@ -1758,9 +1758,10 @@ export class MeshPhysics {
       RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(roadIndices), meshFlags | RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES_TWO_SIDED)
         .setFriction(0.8).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS)
     ) : null;
-    // Chassis and tires share the wall mesh; walls no longer also belong to road.
+    // Correct wall-edge normals and reject back-face contacts. Otherwise curb
+    // risers kick cars upward from behind when driving off the sidewalk.
     this.wheelObstacles = obstacleIndices.length ? this.world.createCollider(
-      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(obstacleIndices), meshFlags)
+      RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(obstacleIndices), meshFlags | RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES)
         .setFriction(0.05).setRestitution(0).setCollisionGroups(OBSTACLE_GROUPS)
     ) : null;
     this.world.step();

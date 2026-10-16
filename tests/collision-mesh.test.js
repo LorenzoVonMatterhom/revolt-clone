@@ -150,3 +150,46 @@ test("original chassis slide across flat and banked triangle seams without being
     }
   }finally{globalThis.fetch=realFetch;}
 });
+
+test("Neighborhood 1 sidewalk descents do not launch cars at the curb lip", async () => {
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  const manifest=readdirSync('levels',{recursive:true}).map(path=>'/levels/'+path.replaceAll('\\','/'));
+  let level;
+  try {
+    level=await loadLevel({id:'nhood1'},manifest);
+    for(const id of ['cougar','rc']) {
+      const mesh=await loadCar(id,id);
+      try {
+        for(const speed of [20,40,80,140])for(const heading of [0,0.5]) {
+          const physics=new MeshPhysics(level.group);
+          try {
+            const car=physics.createCar(mesh);
+            const rotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),heading);
+            // Native sidewalk top y=3.8, curb z=-81.4, road y=-3.7.
+            assert.ok(physics.placeCar(car,new THREE.Vector3(40,3.8,-100),rotation));
+            for(let i=0;i<240;i++){physics.updateVehicle(car,1/120,0,0,0,false);physics.step();}
+            const startHeight=car.body.translation().y;
+            car.body.setLinvel({x:Math.sin(heading)*speed,y:0,z:Math.cos(heading)*speed},true);
+            let maxRise=0,upwardBeforeDrop=0,resets=0;
+            for(let i=0;i<360;i++) {
+              physics.updateVehicle(car,1/120,0,0,0,false);physics.step();
+              const before=new THREE.Vector3().copy(car.body.translation());
+              physics.checkCar(car,1/120);
+              const position=car.body.translation();
+              if(before.distanceTo(position)>1)resets++;
+              maxRise=Math.max(maxRise,position.y-startHeight);
+              if(position.z< -78)upwardBeforeDrop=Math.max(upwardBeforeDrop,car.body.linvel().y);
+              if(position.z> -40)break; // Finish before reaching the opposite wall.
+            }
+            const label=`${id}, speed ${speed}, heading ${heading}`;
+            assert.equal(resets,0,`${label}: normal curb descent triggered recovery`);
+            assert.ok(maxRise<0.25,`${label}: curb launched car ${maxRise} units above sidewalk`);
+            assert.ok(upwardBeforeDrop<2,`${label}: curb imparted upward speed ${upwardBeforeDrop} before descent`);
+            assert.ok(car.body.translation().z> -78,`${label}: car snagged on curb lip`);
+          }finally{physics.dispose();}
+        }
+      }finally{mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
+    }
+  }finally{disposeLevel(level);globalThis.fetch=realFetch;}
+});
