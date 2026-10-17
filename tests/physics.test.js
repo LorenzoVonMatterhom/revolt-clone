@@ -239,7 +239,7 @@ test("two-wheel and four-wheel drive receive equal total engine force, split by 
   physics.dispose();
 });
 
-test("a tipped and immobilized car returns upright without resetting ordinary parked cars", () => {
+test("AI recovery rights tipped cars without resetting ordinary parked cars", () => {
   const ground=new THREE.Group();box(ground,[100,1,100],[0,-0.5,0]);
   const physics=new MeshPhysics(ground),car=physics.createCar(carMesh());
   assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()));
@@ -399,5 +399,59 @@ test("a wall-only collision mesh remains solid without creating a road or suspen
     for(let i=0;i<12;i++){physics.updateVehicle(car,1/120,0,0,0,false);physics.step();}
     assert.ok(car.body.translation().x<3,'Tires must stop at the real wall');
     assert.ok(car.body.linvel().y<0,'Walls must not act as suspension ground');
+  }finally{physics.dispose();}
+});
+
+test("overturned player cars wait for manual flipping instead of automatic recovery", () => {
+  const ground=new THREE.Group();box(ground,[100,1,100],[0,-0.5,0]);
+  const physics=new MeshPhysics(ground);
+  try {
+    for(const angle of [Math.PI/2,Math.PI]) {
+      const car=physics.createCar(carMesh(),{autoRighting:false});
+      assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()));
+      const rotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),angle);
+      car.body.setTranslation({x:20,y:3,z:10},true);car.body.setRotation(rotation,true);
+      physics.world.propagateModifiedBodyPositionsToColliders();
+      for(let i=0;i<1200;i++)physics.checkCar(car,1/120);
+      assert.deepEqual(new THREE.Vector3().copy(car.body.translation()).toArray(),[20,3,10]);
+      assert.ok(new THREE.Quaternion().copy(car.body.rotation()).angleTo(rotation)<0.0001);
+      physics.removeCar(car);
+    }
+  }finally{physics.dispose();}
+});
+
+test("manual flip rights a car locally, preserves heading and clears impact velocity", () => {
+  const ground=new THREE.Group();box(ground,[100,1,100],[0,-0.5,0]);
+  const physics=new MeshPhysics(ground),car=physics.createCar(carMesh(),{autoRighting:false});
+  try {
+    assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()));
+    const heading=0.7;
+    const rotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),heading)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI));
+    car.body.setTranslation({x:20,y:3,z:10},true);car.body.setRotation(rotation,true);
+    car.body.setLinvel({x:2,y:-5,z:4},true);car.body.setAngvel({x:2,y:3,z:1},true);
+    physics.world.propagateModifiedBodyPositionsToColliders();
+    assert.ok(physics.flipCar(car));
+    const position=car.body.translation(),upright=new THREE.Quaternion().copy(car.body.rotation());
+    assert.ok(Math.hypot(position.x-20,position.z-10)<0.001,'Flip must not return to the earlier safe pose');
+    assert.ok(new THREE.Vector3(0,1,0).applyQuaternion(upright).y>0.999);
+    const forward=new THREE.Vector3(0,0,1).applyQuaternion(upright);
+    assert.ok(Math.abs(Math.atan2(forward.x,forward.z)-heading)<0.001);
+    assert.equal(new THREE.Vector3().copy(car.body.linvel()).length(),0);
+    assert.equal(new THREE.Vector3().copy(car.body.angvel()).length(),0);
+    assert.equal(physics.overlapsCar(car,new THREE.Vector3().copy(position),upright),false);
+    assert.equal(physics.flipCar(car),false,'An upright car must not be repositioned');
+  }finally{physics.dispose();}
+});
+
+test("manual flip leaves the car alone when no ground exists below it", () => {
+  const ground=new THREE.Group();box(ground,[20,1,20],[0,-0.5,0]);
+  const physics=new MeshPhysics(ground),car=physics.createCar(carMesh(),{autoRighting:false});
+  try {
+    car.body.setTranslation({x:100,y:4,z:100},true);
+    car.body.setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI),true);
+    const position=car.body.translation(),rotation=car.body.rotation();
+    assert.equal(physics.flipCar(car),false);
+    assert.deepEqual(car.body.translation(),position);assert.deepEqual(car.body.rotation(),rotation);
   }finally{physics.dispose();}
 });

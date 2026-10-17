@@ -15,12 +15,13 @@
   }
   .touch-controls button[data-code="KeyW"] { background: rgba(52, 120, 55, 0.85); }
   .touch-controls button.is-pressed { background: #f1c94b; color: #101010; border-color: #fff; }
-  .touch-pedals { display: grid; grid-template-columns: repeat(2, auto); }
-  .touch-controls .touch-fire {
+  .touch-pedals, .touch-steering { display: grid; grid-template-columns: repeat(2, auto); }
+  .touch-controls .touch-fire, .touch-controls .touch-flip {
     grid-column: 1 / -1; width: 100%; height: 48px;
     background: #b3312c; border-color: #ef746d; font-size: 16px;
   }
-  .touch-controls .touch-fire:disabled { opacity: 0.55; }
+  .touch-controls .touch-flip { background: #255d91; border-color: #76baff; }
+  .touch-controls .touch-fire:disabled, .touch-controls .touch-flip:disabled { opacity: 0.55; }
   .hud-top { top: max(8px, env(safe-area-inset-top)); left: 12px; right: 12px; flex-direction: row; }
   .brand, .help, .debug-panel { display: none; }
   .readouts { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -33,7 +34,7 @@
     pointer-events: none;
   }
   .hud-left button { pointer-events: auto; padding: 0 10px; min-height: 44px; font-size: 12px; }
-  .hud-left #levelSelect, .hud-left #nextLevelBtn { display: none; }
+  .hud-left #levelSelect, .hud-left #nextLevelBtn, .hud-left #flipBtn { display: none; }
   .powerup-slot {
     top: calc(max(8px, env(safe-area-inset-top)) + 102px);
     left: 12px; width: min(220px, calc(100% - 130px)); min-height: 64px;

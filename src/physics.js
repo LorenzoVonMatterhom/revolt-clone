@@ -94,7 +94,7 @@ export class MeshPhysics {
     return hit && hit.normal.y > MIN_ROAD_NORMAL_Y ? position.y + above - hit.timeOfImpact : null;
   }
 
-  createCar(mesh) {
+  createCar(mesh, { autoRighting = true } = {}) {
     const setup = mesh.userData.physics;
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true).setSoftCcdPrediction(0.5).setLinearDamping(0.15).setAngularDamping(1.5));
     const { halfExtents: size, center } = setup;
@@ -129,7 +129,7 @@ export class MeshPhysics {
         .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60);
       return this.world.createCollider(tire, body);
     });
-    const car = { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
+    const car = { body, vehicle, setup, autoRighting, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
     for (const shape of [collider, ...wheelColliders]) this.impactCars.set(shape.handle, car);
     return car;
   }
@@ -182,6 +182,21 @@ export class MeshPhysics {
     return false;
   }
 
+  flipCar(car) {
+    const rotation = new THREE.Quaternion().copy(car.body.rotation());
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
+    if (up.y > 0.7) return false;
+    const position = new THREE.Vector3().copy(car.body.translation());
+    const floor = this.groundAt(position, 0, 40);
+    if (floor === null) return false;
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(rotation);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(rotation);
+    const heading = Math.hypot(forward.x, forward.z) > 0.001
+      ? Math.atan2(forward.x, forward.z) : Math.atan2(-right.z, right.x);
+    position.y = floor;
+    return this.placeCar(car, position, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading));
+  }
+
   parkCar(car) {
     const position=new THREE.Vector3().copy(car.body.translation()),rotation=new THREE.Quaternion().copy(car.body.rotation());
     const side=new THREE.Vector3(1,0,0).applyQuaternion(rotation);side.y=0;side.normalize();
@@ -219,7 +234,10 @@ export class MeshPhysics {
     const bodyCenter = car.setup.center.clone().applyQuaternion(rotation).add(position);
     const deeplyEmbedded = (contact && contact.distance < -0.2) || this.terrain?.projectPoint(bodyCenter, true).isInside;
     car.embeddedTime = deeplyEmbedded ? car.embeddedTime + dt : 0;
-    if ((car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
+    // An overturned player waits for the manual Flip control, even when touching
+    // terrain or another car. AI recovery and upright penetration repair remain.
+    const mayRecover = car.autoRighting || upright >= 0.25;
+    if (mayRecover && (car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
       this.placeCar(car, car.safePose.position, car.safePose.rotation);
       return;
     }

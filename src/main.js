@@ -20,6 +20,7 @@ const startBtn = document.querySelector("#startBtn");
 const levelSelect = document.querySelector("#levelSelect");
 const cameraBtn = document.querySelector("#cameraBtn");
 const resetBtn = document.querySelector("#resetBtn");
+const flipBtn = document.querySelector("#flipBtn");
 const nextLevelBtn = document.querySelector("#nextLevelBtn");
 const muteBtn = document.querySelector("#muteBtn");
 const speedEl = document.querySelector("#speed");
@@ -52,7 +53,7 @@ const clock = new THREE.Clock();
 
 const keys = new Map();
 let raceStarted = false;
-const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading, onFire: () => powerups.fire(player, racers) });
+const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading, onFire: () => powerups.fire(player, racers), onFlip: flipPlayer });
 let cameraMode = 0;
 let muted = false;
 let elapsedRace = 0;
@@ -306,7 +307,7 @@ class CarController {
     this.sliding = false;
     if (this.physics !== physics) {
       this.physics = physics;
-      this.car = physics.createCar(this.mesh);
+      this.car = physics.createCar(this.mesh, { autoRighting: !this.isPlayer });
     }
     const heading = index && tangents[index] ? Math.atan2(tangents[index].x, tangents[index].z) : (loadedLevel.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
@@ -586,6 +587,17 @@ function pressed(code) {
   return keys.get(code) === true || touchControls.pressed(code);
 }
 
+function flipPlayer() {
+  if (!raceStarted || levelLoading || resetFade?.active) return;
+  if (!physics.flipCar(player.car)) return;
+  keys.clear(); touchControls.clear();
+  player.steer = 0; player.sliding = false; player.scrapeHold = 0;
+  skidMarks.previous.delete(player);
+  if (sounds.skid.isPlaying) sounds.skid.stop();
+  if (sounds.scrape.isPlaying) sounds.scrape.stop();
+  player.syncPhysics();
+}
+
 function resetPlayer() {
   if (!raceStarted || levelLoading || resetFade?.active) return;
   const back = Math.max(0, player.lastTrackIndex - 4);
@@ -704,6 +716,10 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 0.033);
   resetFade?.update(dt);
   resetBtn.disabled = resetFade?.active ?? false;
+  const canFlip = raceStarted && !levelLoading && !resetFade?.active &&
+    new THREE.Vector3(0, 1, 0).applyQuaternion(player.mesh.quaternion).y <= 0.7;
+  flipBtn.disabled = !canFlip;
+  touchControls.setFlipEnabled(canFlip);
   if (raceStarted) elapsedRace += dt;
 
   if (raceStarted && !levelLoading) {
@@ -755,6 +771,7 @@ window.addEventListener("keydown", (event) => {
   if (event.target.matches("select, input, textarea")) return;
   if (["KeyF", "ControlLeft"].includes(event.code)) { event.preventDefault(); if (!event.repeat) powerups.fire(player, racers); }
   keys.set(event.code, true);
+  if (event.code === "KeyV") { event.preventDefault(); if (!event.repeat) flipPlayer(); }
   if (event.code === "KeyR") resetPlayer();
   if (event.code === "KeyC") cameraMode = (cameraMode + 1) % 3;
 });
@@ -801,6 +818,7 @@ cameraBtn.addEventListener("click", () => {
   cameraMode = (cameraMode + 1) % 3;
 });
 resetBtn.addEventListener("click", resetPlayer);
+flipBtn.addEventListener("click", flipPlayer);
 powerBtn.addEventListener("click", () => { if (raceStarted && !levelLoading) powerups.fire(player, racers); });
 nextLevelBtn.addEventListener("click", () => {
   switchLevel(currentLevelIndex + 1);
