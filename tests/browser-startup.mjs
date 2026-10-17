@@ -2,6 +2,8 @@ import { chromium, webkit } from "playwright";
 
 // Install a fixture inside the game's module scope only in this browser test.
 function installFlipHarness() {
+  // Software-rendered WebKit must still advance enough real game frames.
+  renderer.setPixelRatio(0.5); renderer.shadowMap.enabled = false;
   window.__flipTest = {
     overturn(moveAside = true) {
       const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), player.heading);
@@ -75,7 +77,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     if (!await flip.isVisible()) throw new Error("Flip button is hidden on mobile");
     const overturned = await page.evaluate(() => window.__flipTest.overturn());
     await page.waitForFunction(elapsed => window.__flipTest.state().elapsed > elapsed + 3,
-      overturned.elapsed, { timeout: 60000 });
+      overturned.elapsed, { timeout: 120000 });
     const beforeFlip = await page.evaluate(() => window.__flipTest.state());
     if (beforeFlip.up > -0.8) throw new Error("Player car automatically righted itself");
     await flip.tap();
