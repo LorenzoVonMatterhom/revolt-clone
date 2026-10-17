@@ -39,7 +39,9 @@ export function meshTriangles(group) {
   return { vertices, indices };
 }
 
-// Chassis contacts all terrain; tires contact steep obstacle faces, not the road.
+// Chassis contacts all terrain; tires contact near-vertical obstacles, not ramps.
+// Native neighborhood ramps include banks around 60-70 degrees.
+const MIN_ROAD_NORMAL_Y = 0.15;
 const CHASSIS_GROUPS = (1 << 16) | 3;
 const TERRAIN_GROUPS = (1 << 16) | 1;
 const TIRE_GROUPS = (2 << 16) | 3;
@@ -67,14 +69,15 @@ export class MeshPhysics {
       b.fromArray(vertices, indices[i + 1] * 3).sub(a);
       c.fromArray(vertices, indices[i + 2] * 3).sub(a);
       const normal = b.cross(c).normalize();
-      const target = Math.abs(normal.y) < 0.65 ? obstacleIndices : roadIndices;
+      const target = Math.abs(normal.y) < MIN_ROAD_NORMAL_Y ? obstacleIndices : roadIndices;
       target.push(indices[i], indices[i + 1], indices[i + 2]);
     }
     const meshFlags = RAPIER.TriMeshFlags.MERGE_DUPLICATE_VERTICES | RAPIER.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES;
-    // Smooth shared road edges without letting correction suppress upright walls.
+    // Tire grip comes from the vehicle controller. Hull contacts must slide
+    // across ramp joins instead of grabbing the pavement like another tire.
     this.terrain = roadIndices.length ? this.world.createCollider(
       RAPIER.ColliderDesc.trimesh(vertices, new Uint32Array(roadIndices), meshFlags | RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES_TWO_SIDED)
-        .setFriction(0.8).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS)
+        .setFriction(0.05).setRestitution(0).setCollisionGroups(TERRAIN_GROUPS)
     ) : null;
     // Correct wall-edge normals and reject back-face contacts. Otherwise curb
     // risers kick cars upward from behind when driving off the sidewalk.
@@ -88,7 +91,7 @@ export class MeshPhysics {
   groundAt(position, above = 1, below = 20) {
     const ray = new RAPIER.Ray({ x: position.x, y: position.y + above, z: position.z }, { x: 0, y: -1, z: 0 });
     const hit = this.world.castRayAndGetNormal(ray, above + below, false, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
-    return hit && hit.normal.y > 0.15 ? position.y + above - hit.timeOfImpact : null;
+    return hit && hit.normal.y > MIN_ROAD_NORMAL_Y ? position.y + above - hit.timeOfImpact : null;
   }
 
   createCar(mesh) {
@@ -202,7 +205,7 @@ export class MeshPhysics {
       ...(this.wheelObstacles ? [car.collider, ...car.wheelColliders].map((shape) => shape.contactCollider(this.wheelObstacles, 0)) : []),
     ].filter(Boolean);
     const contact = contacts.find((hit) => hit.distance < -0.2) ?? contacts[0];
-    const obstacleContact = contacts.some((hit) => Math.abs(hit.normal1.y) < 0.65);
+    const obstacleContact = contacts.some((hit) => Math.abs(hit.normal1.y) < MIN_ROAD_NORMAL_Y);
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).y;
     const stationary = Math.hypot(velocity.x, velocity.z) < 2;
     // Pressing an upright car into a wall is a normal collision, not a reset.
