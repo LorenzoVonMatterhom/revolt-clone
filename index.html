@@ -355,12 +355,13 @@ select:focus-visible {
   }
   .touch-controls button[data-code="KeyW"] { background: rgba(52, 120, 55, 0.85); }
   .touch-controls button.is-pressed { background: #f1c94b; color: #101010; border-color: #fff; }
-  .touch-pedals { display: grid; grid-template-columns: repeat(2, auto); }
-  .touch-controls .touch-fire {
+  .touch-pedals, .touch-steering { display: grid; grid-template-columns: repeat(2, auto); }
+  .touch-controls .touch-fire, .touch-controls .touch-flip {
     grid-column: 1 / -1; width: 100%; height: 48px;
     background: #b3312c; border-color: #ef746d; font-size: 16px;
   }
-  .touch-controls .touch-fire:disabled { opacity: 0.55; }
+  .touch-controls .touch-flip { background: #255d91; border-color: #76baff; }
+  .touch-controls .touch-fire:disabled, .touch-controls .touch-flip:disabled { opacity: 0.55; }
   .hud-top { top: max(8px, env(safe-area-inset-top)); left: 12px; right: 12px; flex-direction: row; }
   .brand, .help, .debug-panel { display: none; }
   .readouts { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -373,7 +374,7 @@ select:focus-visible {
     pointer-events: none;
   }
   .hud-left button { pointer-events: auto; padding: 0 10px; min-height: 44px; font-size: 12px; }
-  .hud-left #levelSelect, .hud-left #nextLevelBtn { display: none; }
+  .hud-left #levelSelect, .hud-left #nextLevelBtn, .hud-left #flipBtn { display: none; }
   .powerup-slot {
     top: calc(max(8px, env(safe-area-inset-top)) + 102px);
     left: 12px; width: min(220px, calc(100% - 130px)); min-height: 64px;
@@ -427,6 +428,7 @@ select:focus-visible {
       <div class="hud hud-left">
         <select id="levelSelect" title="Choose level" aria-label="Choose level"></select>
         <button id="cameraBtn" type="button" title="Switch camera">Camera</button>
+        <button id="flipBtn" type="button" title="Flip car upright (V)" aria-label="Flip car" disabled>Flip</button>
         <button id="resetBtn" type="button" title="Reset car">Reset</button>
         <button id="nextLevelBtn" type="button" title="Next level">Next Level</button>
         <button id="muteBtn" type="button" title="Toggle sound">Sound</button>
@@ -453,7 +455,7 @@ select:focus-visible {
       <div class="help" id="help">
         <span>WASD / arrows drive</span>
         <span>Space handbrake</span>
-        <span>R reset</span>
+        <span>V flip · R reset</span>
       </div>
       <div class="start" id="start">
         <div class="start-panel">
@@ -875,6 +877,7 @@ const startBtn = document.querySelector("#startBtn");
 const levelSelect = document.querySelector("#levelSelect");
 const cameraBtn = document.querySelector("#cameraBtn");
 const resetBtn = document.querySelector("#resetBtn");
+const flipBtn = document.querySelector("#flipBtn");
 const nextLevelBtn = document.querySelector("#nextLevelBtn");
 const muteBtn = document.querySelector("#muteBtn");
 const speedEl = document.querySelector("#speed");
@@ -907,7 +910,7 @@ const clock = new THREE.Clock();
 
 const keys = new Map();
 let raceStarted = false;
-const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading, onFire: () => powerups.fire(player, racers) });
+const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading, onFire: () => powerups.fire(player, racers), onFlip: flipPlayer });
 let cameraMode = 0;
 let muted = false;
 let elapsedRace = 0;
@@ -1161,7 +1164,7 @@ class CarController {
     this.sliding = false;
     if (this.physics !== physics) {
       this.physics = physics;
-      this.car = physics.createCar(this.mesh);
+      this.car = physics.createCar(this.mesh, { autoRighting: !this.isPlayer });
     }
     const heading = index && tangents[index] ? Math.atan2(tangents[index].x, tangents[index].z) : (loadedLevel.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
@@ -1441,6 +1444,17 @@ function pressed(code) {
   return keys.get(code) === true || touchControls.pressed(code);
 }
 
+function flipPlayer() {
+  if (!raceStarted || levelLoading || resetFade?.active) return;
+  if (!physics.flipCar(player.car)) return;
+  keys.clear(); touchControls.clear();
+  player.steer = 0; player.sliding = false; player.scrapeHold = 0;
+  skidMarks.previous.delete(player);
+  if (sounds.skid.isPlaying) sounds.skid.stop();
+  if (sounds.scrape.isPlaying) sounds.scrape.stop();
+  player.syncPhysics();
+}
+
 function resetPlayer() {
   if (!raceStarted || levelLoading || resetFade?.active) return;
   const back = Math.max(0, player.lastTrackIndex - 4);
@@ -1555,19 +1569,27 @@ function drawMinimap() {
   mapCtx.restore();
 }
 
+function stepRacePhysics() {
+  for (const racer of racers) racer.update(PHYSICS_STEP);
+  physics.step();
+  for (const racer of racers) { physics.checkCar(racer.car, PHYSICS_STEP, racers.map(other=>other.car)); racer.syncPhysics(); skidMarks.track(racer); }
+  powerups.update(PHYSICS_STEP, racers);
+}
+
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.033);
   resetFade?.update(dt);
   resetBtn.disabled = resetFade?.active ?? false;
+  const canFlip = raceStarted && !levelLoading && !resetFade?.active &&
+    new THREE.Vector3(0, 1, 0).applyQuaternion(player.mesh.quaternion).y <= 0.7;
+  flipBtn.disabled = !canFlip;
+  touchControls.setFlipEnabled(canFlip);
   if (raceStarted) elapsedRace += dt;
 
   if (raceStarted && !levelLoading) {
     physicsAccumulator += dt;
     while (physicsAccumulator >= PHYSICS_STEP) {
-      for (const racer of racers) racer.update(PHYSICS_STEP);
-      physics.step();
-      for (const racer of racers) { physics.checkCar(racer.car, PHYSICS_STEP, racers.map(other=>other.car)); racer.syncPhysics(); skidMarks.track(racer); }
-      powerups.update(PHYSICS_STEP, racers);
+      stepRacePhysics();
       physicsAccumulator -= PHYSICS_STEP;
     }
   }
@@ -1610,6 +1632,7 @@ window.addEventListener("keydown", (event) => {
   if (event.target.matches("select, input, textarea")) return;
   if (["KeyF", "ControlLeft"].includes(event.code)) { event.preventDefault(); if (!event.repeat) powerups.fire(player, racers); }
   keys.set(event.code, true);
+  if (event.code === "KeyV") { event.preventDefault(); if (!event.repeat) flipPlayer(); }
   if (event.code === "KeyR") resetPlayer();
   if (event.code === "KeyC") cameraMode = (cameraMode + 1) % 3;
 });
@@ -1656,6 +1679,7 @@ cameraBtn.addEventListener("click", () => {
   cameraMode = (cameraMode + 1) % 3;
 });
 resetBtn.addEventListener("click", resetPlayer);
+flipBtn.addEventListener("click", flipPlayer);
 powerBtn.addEventListener("click", () => { if (raceStarted && !levelLoading) powerups.fire(player, racers); });
 nextLevelBtn.addEventListener("click", () => {
   switchLevel(currentLevelIndex + 1);
@@ -1776,7 +1800,7 @@ export class MeshPhysics {
     return hit && hit.normal.y > MIN_ROAD_NORMAL_Y ? position.y + above - hit.timeOfImpact : null;
   }
 
-  createCar(mesh) {
+  createCar(mesh, { autoRighting = true } = {}) {
     const setup = mesh.userData.physics;
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true).setSoftCcdPrediction(0.5).setLinearDamping(0.15).setAngularDamping(1.5));
     const { halfExtents: size, center } = setup;
@@ -1811,7 +1835,7 @@ export class MeshPhysics {
         .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60);
       return this.world.createCollider(tire, body);
     });
-    const car = { body, vehicle, setup, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
+    const car = { body, vehicle, setup, autoRighting, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
     for (const shape of [collider, ...wheelColliders]) this.impactCars.set(shape.handle, car);
     return car;
   }
@@ -1864,6 +1888,21 @@ export class MeshPhysics {
     return false;
   }
 
+  flipCar(car) {
+    const rotation = new THREE.Quaternion().copy(car.body.rotation());
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
+    if (up.y > 0.7) return false;
+    const position = new THREE.Vector3().copy(car.body.translation());
+    const floor = this.groundAt(position, 0, 40);
+    if (floor === null) return false;
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(rotation);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(rotation);
+    const heading = Math.hypot(forward.x, forward.z) > 0.001
+      ? Math.atan2(forward.x, forward.z) : Math.atan2(-right.z, right.x);
+    position.y = floor;
+    return this.placeCar(car, position, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading));
+  }
+
   parkCar(car) {
     const position=new THREE.Vector3().copy(car.body.translation()),rotation=new THREE.Quaternion().copy(car.body.rotation());
     const side=new THREE.Vector3(1,0,0).applyQuaternion(rotation);side.y=0;side.normalize();
@@ -1901,7 +1940,10 @@ export class MeshPhysics {
     const bodyCenter = car.setup.center.clone().applyQuaternion(rotation).add(position);
     const deeplyEmbedded = (contact && contact.distance < -0.2) || this.terrain?.projectPoint(bodyCenter, true).isInside;
     car.embeddedTime = deeplyEmbedded ? car.embeddedTime + dt : 0;
-    if ((car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
+    // An overturned player waits for the manual Flip control, even when touching
+    // terrain or another car. AI recovery and upright penetration repair remain.
+    const mayRecover = car.autoRighting || upright >= 0.25;
+    if (mayRecover && (car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
       this.placeCar(car, car.safePose.position, car.safePose.rotation);
       return;
     }
@@ -3352,7 +3394,7 @@ export function bindTouchButton(button, code, pointers, enabled) {
   button.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
-export function createTouchControls({ enabled, onFire = () => {} }) {
+export function createTouchControls({ enabled, onFire = () => {}, onFlip = () => {} }) {
   const controls = document.createElement("div");
   controls.className = "touch-controls hud";
   controls.setAttribute("role", "group");
@@ -3376,6 +3418,26 @@ export function createTouchControls({ enabled, onFire = () => {} }) {
     }
     controls.append(group);
   }
+  const steering = controls.firstElementChild;
+  steering.classList.add("touch-steering");
+  const flipButton = document.createElement("button");
+  flipButton.type = "button";
+  flipButton.className = "touch-flip";
+  flipButton.textContent = "Flip";
+  flipButton.setAttribute("aria-label", "Flip car");
+  flipButton.disabled = true;
+  steering.prepend(flipButton);
+  flipButton.addEventListener("pointerdown", (event) => {
+    if (!enabled() || flipButton.disabled || (event.pointerType === "mouse" && event.button !== 0)) return;
+    event.preventDefault();
+    flipButton.setPointerCapture(event.pointerId);
+    flipButton.classList.add("is-pressed");
+    onFlip();
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    flipButton.addEventListener(type, () => flipButton.classList.remove("is-pressed"));
+  }
+  flipButton.addEventListener("contextmenu", (event) => event.preventDefault());
   const pedals = controls.lastElementChild;
   pedals.classList.add("touch-pedals");
   const fireButton = document.createElement("button");
@@ -3404,10 +3466,10 @@ export function createTouchControls({ enabled, onFire = () => {} }) {
   window.addEventListener("blur", clear);
   document.addEventListener("visibilitychange", () => { if (document.hidden) clear(); });
   return { pressed: (code) => [...pointers.values()].includes(code), clear,
-    setFireEnabled: (available) => { fireButton.disabled = !available; } };
+    setFireEnabled: (available) => { fireButton.disabled = !available; },
+    setFlipEnabled: (available) => { flipButton.disabled = !available; } };
 }
-
-    </script>
+</script>
     <script type="module">
       // Build browser module URLs from the readable game code embedded above.
       // No npm install, bundler, or compilation is required.

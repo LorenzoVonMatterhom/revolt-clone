@@ -14,7 +14,7 @@ export function bindTouchButton(button, code, pointers, enabled) {
   button.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
-export function createTouchControls({ enabled, onFire = () => {} }) {
+export function createTouchControls({ enabled, onFire = () => {}, onFlip = () => {} }) {
   const controls = document.createElement("div");
   controls.className = "touch-controls hud";
   controls.setAttribute("role", "group");
@@ -38,6 +38,26 @@ export function createTouchControls({ enabled, onFire = () => {} }) {
     }
     controls.append(group);
   }
+  const steering = controls.firstElementChild;
+  steering.classList.add("touch-steering");
+  const flipButton = document.createElement("button");
+  flipButton.type = "button";
+  flipButton.className = "touch-flip";
+  flipButton.textContent = "Flip";
+  flipButton.setAttribute("aria-label", "Flip car");
+  flipButton.disabled = true;
+  steering.prepend(flipButton);
+  flipButton.addEventListener("pointerdown", (event) => {
+    if (!enabled() || flipButton.disabled || (event.pointerType === "mouse" && event.button !== 0)) return;
+    event.preventDefault();
+    flipButton.setPointerCapture(event.pointerId);
+    flipButton.classList.add("is-pressed");
+    onFlip();
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    flipButton.addEventListener(type, () => flipButton.classList.remove("is-pressed"));
+  }
+  flipButton.addEventListener("contextmenu", (event) => event.preventDefault());
   const pedals = controls.lastElementChild;
   pedals.classList.add("touch-pedals");
   const fireButton = document.createElement("button");
@@ -66,5 +86,6 @@ export function createTouchControls({ enabled, onFire = () => {} }) {
   window.addEventListener("blur", clear);
   document.addEventListener("visibilitychange", () => { if (document.hidden) clear(); });
   return { pressed: (code) => [...pointers.values()].includes(code), clear,
-    setFireEnabled: (available) => { fireButton.disabled = !available; } };
+    setFireEnabled: (available) => { fireButton.disabled = !available; },
+    setFlipEnabled: (available) => { flipButton.disabled = !available; } };
 }
