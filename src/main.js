@@ -712,6 +712,13 @@ function drawMinimap() {
   mapCtx.restore();
 }
 
+function stepRacePhysics() {
+  for (const racer of racers) racer.update(PHYSICS_STEP);
+  physics.step();
+  for (const racer of racers) { physics.checkCar(racer.car, PHYSICS_STEP, racers.map(other=>other.car)); racer.syncPhysics(); skidMarks.track(racer); }
+  powerups.update(PHYSICS_STEP, racers);
+}
+
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.033);
   resetFade?.update(dt);
@@ -725,10 +732,7 @@ function animate() {
   if (raceStarted && !levelLoading) {
     physicsAccumulator += dt;
     while (physicsAccumulator >= PHYSICS_STEP) {
-      for (const racer of racers) racer.update(PHYSICS_STEP);
-      physics.step();
-      for (const racer of racers) { physics.checkCar(racer.car, PHYSICS_STEP, racers.map(other=>other.car)); racer.syncPhysics(); skidMarks.track(racer); }
-      powerups.update(PHYSICS_STEP, racers);
+      stepRacePhysics();
       physicsAccumulator -= PHYSICS_STEP;
     }
   }

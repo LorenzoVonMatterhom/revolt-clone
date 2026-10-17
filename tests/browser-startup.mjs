@@ -2,7 +2,7 @@ import { chromium, webkit } from "playwright";
 
 // Install a fixture inside the game's module scope only in this browser test.
 function installFlipHarness() {
-  // Software-rendered WebKit must still advance enough real game frames.
+  // Keep software-rendered WebKit responsive for UI interactions.
   renderer.setPixelRatio(0.5); renderer.shadowMap.enabled = false;
   window.__flipTest = {
     overturn(moveAside = true) {
@@ -17,6 +17,10 @@ function installFlipHarness() {
       player.car.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       player.car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       player.syncPhysics();
+      return this.state();
+    },
+    advance(seconds) {
+      for (let i = 0; i < Math.ceil(seconds / PHYSICS_STEP); i++) stepRacePhysics();
       return this.state();
     },
     state() {
@@ -75,10 +79,10 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     console.log(name, "Fire button used a power-up; Slide is removed");
     const flip = page.getByRole("button", { name: "Flip car", exact: true });
     if (!await flip.isVisible()) throw new Error("Flip button is hidden on mobile");
-    const overturned = await page.evaluate(() => window.__flipTest.overturn());
-    await page.waitForFunction(elapsed => window.__flipTest.state().elapsed > elapsed + 3,
-      overturned.elapsed, { timeout: 120000 });
-    const beforeFlip = await page.evaluate(() => window.__flipTest.state());
+    const beforeFlip = await page.evaluate(() => {
+      window.__flipTest.overturn();
+      return window.__flipTest.advance(3);
+    });
     if (beforeFlip.up > -0.8) throw new Error("Player car automatically righted itself");
     await flip.tap();
     await page.waitForFunction(() => window.__flipTest.state().up > 0.9);
