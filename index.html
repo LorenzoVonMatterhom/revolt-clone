@@ -338,6 +338,11 @@ select:focus-visible {
   }
 }
 
+.debug-panel summary { cursor: pointer; font-size: 14px; font-weight: 700; color: #f1c94b; min-height: 32px; line-height: 32px; touch-action: manipulation; }
+.debug-panel[open] summary { margin-bottom: 6px; }
+.debug-panel select { min-height: 40px; }
+.debug-panel { z-index: 8; }
+
 .touch-controls { display: none; }
 @media (any-pointer: coarse), (max-width: 1024px) {
   #scene { touch-action: none; }
@@ -363,7 +368,8 @@ select:focus-visible {
   .touch-controls .touch-flip { background: #255d91; border-color: #76baff; }
   .touch-controls .touch-fire:disabled, .touch-controls .touch-flip:disabled { opacity: 0.55; }
   .hud-top { top: max(8px, env(safe-area-inset-top)); left: 12px; right: 12px; flex-direction: row; }
-  .brand, .help, .debug-panel { display: none; }
+  .brand, .help { display: none; }
+  .debug-panel { display: block; top: 200px; right: 12px; width: 200px; padding: 8px; max-height: calc(100dvh - 360px); overflow-y: auto; }
   .readouts { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .readouts div { min-height: 42px; padding: 4px 8px; }
   .readouts strong { font-size: 1rem; }
@@ -395,6 +401,7 @@ select:focus-visible {
   .start h3, #carStats { display: none; }
   .track-label { margin-top: 8px; }
   .minimap { width: 64px; height: 64px; }
+  .debug-panel { top: 108px; max-height: calc(100dvh - 120px); width: 190px; }
 }
 
     </style>
@@ -437,8 +444,8 @@ select:focus-visible {
       <div class="hud minimap" aria-hidden="true">
         <canvas id="map" width="180" height="180"></canvas>
       </div>
-      <section class="hud debug-panel" id="debugPanel" aria-label="Temporary debugging panel">
-        <h2>Debug <span>Temporary</span></h2>
+      <details class="hud debug-panel" id="debugPanel" aria-label="Power-up debug" open>
+        <summary>Power-up debug</summary>
         <label for="debugPowerup">Power-up</label>
         <select id="debugPowerup" aria-label="Debug power-up"></select>
         <div class="debug-actions">
@@ -447,7 +454,7 @@ select:focus-visible {
           <button id="debugClear" type="button">Clear</button>
         </div>
         <output id="debugStatus" aria-live="polite">No Pick Up</output>
-      </section>
+      </details>
       <div class="hud powerup-slot">
         <button id="powerBtn" type="button" disabled aria-label="Use power-up" title="Use power-up (F or left Ctrl)"><canvas id="powerIcon" width="64" height="64" aria-hidden="true"></canvas></button>
         <div><strong id="powerName">No Pick Up</strong><span id="powerStatus" role="status"></span></div>

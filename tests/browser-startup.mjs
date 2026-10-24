@@ -111,6 +111,13 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     console.log(name, "mobile Cougar race started");
     if (!await page.locator('.touch-controls button[data-code="KeyW"]').isVisible()) throw new Error("Gas button is hidden");
     console.log(name, "touch gas button visible");
+    const debug = page.locator("#debugPanel");
+    if (!await debug.isVisible() || !await page.locator("#debugPowerup").isVisible()) throw new Error("Power-up debug selector is hidden on mobile");
+    await debug.locator("summary").tap();
+    if (await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not collapse");
+    await debug.locator("summary").tap();
+    if (!await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not reopen");
+    console.log(name, "mobile power-up debug selector is visible and collapsible");
     if (await page.locator('.touch-controls button[data-code="Space"]').count()) throw new Error("Slide button should be removed");
     const fire = page.getByRole("button", { name: "Fire power-up", exact: true });
     if (!await fire.isVisible()) throw new Error("Fire button is hidden");

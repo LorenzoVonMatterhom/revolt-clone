@@ -23,7 +23,8 @@
   .touch-controls .touch-flip { background: #255d91; border-color: #76baff; }
   .touch-controls .touch-fire:disabled, .touch-controls .touch-flip:disabled { opacity: 0.55; }
   .hud-top { top: max(8px, env(safe-area-inset-top)); left: 12px; right: 12px; flex-direction: row; }
-  .brand, .help, .debug-panel { display: none; }
+  .brand, .help { display: none; }
+  .debug-panel { display: block; top: 200px; right: 12px; width: 200px; padding: 8px; max-height: calc(100dvh - 360px); overflow-y: auto; }
   .readouts { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .readouts div { min-height: 42px; padding: 4px 8px; }
   .readouts strong { font-size: 1rem; }
@@ -55,4 +56,5 @@
   .start h3, #carStats { display: none; }
   .track-label { margin-top: 8px; }
   .minimap { width: 64px; height: 64px; }
+  .debug-panel { top: 108px; max-height: calc(100dvh - 120px); width: 190px; }
 }

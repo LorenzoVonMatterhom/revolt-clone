@@ -330,3 +330,8 @@ select:focus-visible {
     max-width: 100%;
   }
 }
+
+.debug-panel summary { cursor: pointer; font-size: 14px; font-weight: 700; color: #f1c94b; min-height: 32px; line-height: 32px; touch-action: manipulation; }
+.debug-panel[open] summary { margin-bottom: 6px; }
+.debug-panel select { min-height: 40px; }
+.debug-panel { z-index: 8; }
