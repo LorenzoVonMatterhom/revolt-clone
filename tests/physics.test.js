@@ -137,7 +137,7 @@ test("player steering gain increases front-wheel angle without changing default 
   physics.dispose();
 });
 
-test("Cougar and RC Bandit get at least 54 degrees of player steering in both directions", async () => {
+test("Cougar and RC Bandit keep the same steering angle at every driving speed", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async url => new Response(readFileSync(String(url).slice(1)));
   try {
@@ -145,13 +145,20 @@ test("Cougar and RC Bandit get at least 54 degrees of player steering in both di
       const ground = new THREE.Group(); box(ground,[100,1,100],[0,-0.5,0]);
       const physics = new MeshPhysics(ground), mesh = await loadCar(id,id), car = physics.createCar(mesh);
       try {
-        for (const input of [-1,1]) {
-          physics.updateVehicle(car,1/120,0,0,input,false,1,2.1);
-          car.setup.wheels.forEach((wheel,i) => {
-            const angle = car.vehicle.wheelSteering(i);
-            if (wheel.turnable) assert.ok(angle * input >= 54 * Math.PI/180 && Math.abs(angle) <= 1.05001);
-            else assert.equal(angle,0);
-          });
+        for (const input of [-1,-0.5,0.5,1]) {
+          let restingAngles;
+          for (const speed of [0,40,100,160,-70]) {
+            car.body.setLinvel({x:0,y:0,z:speed},true);
+            physics.updateVehicle(car,1/120,0,0,input,false,1,2.1);
+            const angles=car.setup.wheels.map((_,i)=>car.vehicle.wheelSteering(i));
+            restingAngles ??= angles;
+            car.setup.wheels.forEach((wheel,i) => {
+              const angle=angles[i];
+              assert.ok(Math.abs(angle-restingAngles[i])<0.000001,`${id}: speed ${speed} changed steering input ${input}`);
+              if (wheel.turnable && Math.abs(input)===1) assert.ok(angle * input >= 54 * Math.PI/180 && Math.abs(angle) <= 1.05001);
+              if (!wheel.turnable) assert.equal(angle,0);
+            });
+          }
         }
         physics.updateVehicle(car,1/120,0,0,1,false);
         car.setup.wheels.forEach((wheel,i) => {
