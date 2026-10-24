@@ -137,7 +137,7 @@ test("player steering gain increases front-wheel angle without changing default 
   physics.dispose();
 });
 
-test("Cougar and RC Bandit keep the same steering angle at every driving speed", async () => {
+test("Cougar and RC Bandit reduce steering smoothly by at most ten percent at speed", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async url => new Response(readFileSync(String(url).slice(1)));
   try {
@@ -147,15 +147,20 @@ test("Cougar and RC Bandit keep the same steering angle at every driving speed",
       try {
         for (const input of [-1,-0.5,0.5,1]) {
           let restingAngles;
-          for (const speed of [0,40,100,160,-70]) {
+          for (const speed of [0,40,70,100,160,180,260,-70]) {
             car.body.setLinvel({x:0,y:0,z:speed},true);
             physics.updateVehicle(car,1/120,0,0,input,false,1,2.1);
             const angles=car.setup.wheels.map((_,i)=>car.vehicle.wheelSteering(i));
             restingAngles ??= angles;
             car.setup.wheels.forEach((wheel,i) => {
               const angle=angles[i];
-              assert.ok(Math.abs(angle-restingAngles[i])<0.000001,`${id}: speed ${speed} changed steering input ${input}`);
-              if (wheel.turnable && Math.abs(input)===1) assert.ok(angle * input >= 54 * Math.PI/180 && Math.abs(angle) <= 1.05001);
+              if (wheel.turnable) {
+                const ratio = angle / restingAngles[i];
+                assert.ok(ratio >= .899999 && ratio <= 1.000001);
+                if (Math.abs(speed) >= 180) assert.ok(Math.abs(ratio - .9) < .000001);
+                if (speed === 0) assert.equal(ratio, 1);
+              }
+              if (wheel.turnable && Math.abs(input)===1) assert.ok(angle * input >= 48.5 * Math.PI/180 && Math.abs(angle) <= 1.05001);
               if (!wheel.turnable) assert.equal(angle,0);
             });
           }
