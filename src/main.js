@@ -517,16 +517,33 @@ function selectCar(index) {
   canvas.dataset.selectedCar = car.id;
 }
 selectCar(0);
-document.querySelector("#startDescription").textContent = "";
+document.querySelector("#startDescription").textContent = "WASD to move · Drag with the mouse to look · Click a box to select a car";
 carSelect.addEventListener("change", () => selectCar(Number(carSelect.value)));
 document.querySelector("#prevCar").addEventListener("click", () => selectCar(showroom.selected - 1));
 document.querySelector("#nextCar").addEventListener("click", () => selectCar(showroom.selected + 1));
-canvas.addEventListener("pointerdown", (event) => {
-  if (raceStarted || levelLoading) return;
+let showroomDrag = null;
+canvas.tabIndex = 0;
+canvas.addEventListener("pointerdown", event => {
+  if (raceStarted || levelLoading || event.button !== 0) return;
+  canvas.focus({ preventScroll: true });
+  showroomDrag = { x: event.clientX, y: event.clientY, distance: 0 };
+  canvas.setPointerCapture(event.pointerId);
+});
+canvas.addEventListener("pointermove", event => {
+  if (!showroomDrag || raceStarted || levelLoading) return;
+  const dx = event.clientX - showroomDrag.x, dy = event.clientY - showroomDrag.y;
+  showroomDrag.distance += Math.abs(dx) + Math.abs(dy);
+  if (event.pointerType !== "touch") showroom.navigation.look(dx, dy);
+  showroomDrag.x = event.clientX; showroomDrag.y = event.clientY;
+});
+canvas.addEventListener("pointerup", event => {
+  const drag = showroomDrag; showroomDrag = null;
+  if (!drag || drag.distance > 5 || raceStarted || levelLoading) return;
   const rect = canvas.getBoundingClientRect();
   const selected = showroom.pick((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
   if (selected) selectCar(showroom.selected);
 });
+canvas.addEventListener("pointercancel", () => { showroomDrag = null; });
 function openMenu() {
   resetFade?.cancel(); resetBtn.disabled = false;
   raceStarted = false; keys.clear(); touchControls.clear(); physicsAccumulator = 0;
@@ -732,7 +749,7 @@ function animate() {
   updateHud();
   drawMinimap();
 
-  if (!raceStarted && showroom) showroom.render(renderer, dt, camera.aspect);
+  if (!raceStarted && showroom) showroom.render(renderer, dt, camera.aspect, keys);
   else renderer.render(scene, camera);
   canvas.dataset.view = raceStarted ? "race" : "menu";
   canvas.dataset.physics = JSON.stringify({ position: player.position.toArray(), velocity: player.velocity.toArray(), airborne: player.airborne, steer: player.steer, triangleCount: physics.triangleCount });
@@ -747,7 +764,8 @@ function animate() {
 window.addEventListener("resize", resize);
 window.addEventListener("keydown", (event) => {
   if (!raceStarted) {
-    if (event.target.matches("select, button")) return;
+    if (event.target.matches("select, input, textarea, button")) return;
+    if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)) { event.preventDefault(); keys.set(event.code, true); }
     if (event.code === "ArrowLeft") { event.preventDefault(); selectCar(showroom.selected - 1); }
     if (event.code === "ArrowRight") { event.preventDefault(); selectCar(showroom.selected + 1); }
     if (event.code === "Enter") startBtn.click();
@@ -762,7 +780,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyC") cameraMode = (cameraMode + 1) % 3;
 });
 window.addEventListener("keyup", (event) => keys.set(event.code, false));
-window.addEventListener("blur", () => keys.clear());
+window.addEventListener("blur", () => { keys.clear(); showroomDrag = null; });
 
 startBtn.addEventListener("click", async () => {
   if (levelLoading) return;
@@ -789,6 +807,7 @@ startBtn.addEventListener("click", async () => {
     startBtn.disabled = false; return;
   }
   startBtn.disabled = false;
+  keys.clear(); showroomDrag = null;
   raceStarted = true;
   startOverlay.classList.add("hidden");
   document.querySelector("#game").classList.remove("menu-open");

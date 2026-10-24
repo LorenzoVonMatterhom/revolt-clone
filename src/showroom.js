@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { ShowroomNavigation } from "./showroom-navigation.js";
 import { gameAssetUrl } from "./assets.js";
 import { loadLevel, loadCar, parsePrm, makeMeshes } from "./revolt.js";
 import { FRONTEND } from "./levels.js";
@@ -132,6 +133,7 @@ export class Showroom {
   constructor() {
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x111111);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 800);
+    this.navigation = new ShowroomNavigation(this.camera);
     this.boxes = []; this.selected = 0; this.ray = new THREE.Raycaster();
   }
 
@@ -149,12 +151,16 @@ export class Showroom {
     return box ? this.select(box.userData.carIndex) : null;
   }
 
-  render(renderer, dt, aspect) {
+  render(renderer, dt, aspect, keys = new Map()) {
     this.camera.aspect = aspect; this.camera.updateProjectionMatrix();
     // Face the sale-display / magazine-rack corner, rather than the central aisle.
     const portrait = aspect < 1;
-    this.camera.position.set(portrait ? 118 : 145, portrait ? 82 : 76, -134);
-    this.camera.lookAt(256, portrait ? 35 : 28, -134);
+    if (!this.navigation.initialized) {
+      this.camera.position.set(portrait ? 118 : 145, portrait ? 82 : 76, -134);
+      this.camera.lookAt(256, portrait ? 35 : 28, -134);
+      this.navigation.initialized = true;
+    }
+    this.navigation.update(dt, keys);
     for (const [i, box] of this.boxes.entries()) {
       const target = i === this.selected ? new THREE.Vector3(225, portrait ? 49 : 42, portrait ? -134 : -112) : box.userData.home;
       box.position.lerp(target, 1 - Math.exp(-dt * 9));
