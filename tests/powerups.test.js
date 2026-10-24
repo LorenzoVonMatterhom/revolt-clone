@@ -358,3 +358,32 @@ for (const id of ["rc", "cougar", "sugo", "phat"]) test(`shockwave overturns the
     mesh?.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); });
   }
 });
+
+test("bomb makes textured, emissive and multi-material car parts solid black and restores originals", () => {
+  const f = fixture(), racer = f.racers[0];
+  const texture = new THREE.Texture();
+  const bright = new THREE.MeshStandardMaterial({ color: 0xff6633, emissive: 0xffffff, map: texture });
+  const glass = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .3 });
+  const part = new THREE.Mesh(new THREE.BoxGeometry(), [bright, glass]); racer.mesh.add(part);
+  const original = racer.mesh.material;
+  try {
+    f.system.debugGive(racer, "bomb"); f.system.update(.01, f.racers);
+    assert.equal(racer.mesh.material.color.getHex(), 0);
+    for (const material of part.material) {
+      assert.equal(material.color.getHex(), 0);
+      assert.equal(material.isMeshBasicMaterial, true);
+      assert.equal(material.map, null);
+      assert.equal(material.transparent, false);
+    }
+    assert.equal(bright.color.getHex(), 0xff6633);
+    f.system.debugClear(racer);
+    assert.equal(racer.mesh.material, original);
+    assert.equal(part.material[0], bright); assert.equal(part.material[1], glass);
+    assert.equal(bright.color.getHex(), 0xff6633);
+    assert.equal(original.color.getHex(), 0xffffff);
+    f.system.debugGive(racer, "bomb"); f.system.update(.01, f.racers);
+    racer.powerups.bomb = .001; f.system.update(.01, f.racers);
+    assert.equal(racer.mesh.material, original);
+    assert.equal(part.material[0], bright);
+  } finally { f.cleanup(); texture.dispose(); }
+});
