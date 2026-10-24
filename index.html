@@ -977,6 +977,29 @@ export function installAudioLifecycle(listener, win, doc, isMuted) {
   return { update };
 }
 </script>
+<script type="text/plain" data-game-module="showroom-navigation.js">
+import * as THREE from "three";
+
+export class ShowroomNavigation {
+  constructor(camera) { this.camera = camera; this.initialized = false; }
+  look(dx, dy) {
+    const angles = new THREE.Euler().setFromQuaternion(this.camera.quaternion, "YXZ");
+    angles.y -= dx * 0.003;
+    angles.x = THREE.MathUtils.clamp(angles.x - dy * 0.003, -1.45, 1.45);
+    this.camera.quaternion.setFromEuler(angles);
+  }
+  update(dt, keys) {
+    const x = Number(keys.get("KeyD") === true) - Number(keys.get("KeyA") === true);
+    const z = Number(keys.get("KeyW") === true) - Number(keys.get("KeyS") === true);
+    if (!x && !z) return;
+    const forward = this.camera.getWorldDirection(new THREE.Vector3());
+    forward.y = 0; forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+    const movement = forward.multiplyScalar(z).addScaledVector(right, x).normalize();
+    this.camera.position.addScaledVector(movement, Math.min(dt, 0.05) * 65);
+  }
+}
+</script>
 <script type="text/plain" data-game-module="main.js">
 
 
@@ -1498,16 +1521,33 @@ function selectCar(index) {
   canvas.dataset.selectedCar = car.id;
 }
 selectCar(0);
-document.querySelector("#startDescription").textContent = "";
+document.querySelector("#startDescription").textContent = "WASD to move · Drag with the mouse to look · Click a box to select a car";
 carSelect.addEventListener("change", () => selectCar(Number(carSelect.value)));
 document.querySelector("#prevCar").addEventListener("click", () => selectCar(showroom.selected - 1));
 document.querySelector("#nextCar").addEventListener("click", () => selectCar(showroom.selected + 1));
-canvas.addEventListener("pointerdown", (event) => {
-  if (raceStarted || levelLoading) return;
+let showroomDrag = null;
+canvas.tabIndex = 0;
+canvas.addEventListener("pointerdown", event => {
+  if (raceStarted || levelLoading || event.button !== 0) return;
+  canvas.focus({ preventScroll: true });
+  showroomDrag = { x: event.clientX, y: event.clientY, distance: 0 };
+  canvas.setPointerCapture(event.pointerId);
+});
+canvas.addEventListener("pointermove", event => {
+  if (!showroomDrag || raceStarted || levelLoading) return;
+  const dx = event.clientX - showroomDrag.x, dy = event.clientY - showroomDrag.y;
+  showroomDrag.distance += Math.abs(dx) + Math.abs(dy);
+  if (event.pointerType !== "touch") showroom.navigation.look(dx, dy);
+  showroomDrag.x = event.clientX; showroomDrag.y = event.clientY;
+});
+canvas.addEventListener("pointerup", event => {
+  const drag = showroomDrag; showroomDrag = null;
+  if (!drag || drag.distance > 5 || raceStarted || levelLoading) return;
   const rect = canvas.getBoundingClientRect();
   const selected = showroom.pick((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
   if (selected) selectCar(showroom.selected);
 });
+canvas.addEventListener("pointercancel", () => { showroomDrag = null; });
 function openMenu() {
   resetFade?.cancel(); resetBtn.disabled = false;
   raceStarted = false; keys.clear(); touchControls.clear(); physicsAccumulator = 0;
@@ -1713,7 +1753,7 @@ function animate() {
   updateHud();
   drawMinimap();
 
-  if (!raceStarted && showroom) showroom.render(renderer, dt, camera.aspect);
+  if (!raceStarted && showroom) showroom.render(renderer, dt, camera.aspect, keys);
   else renderer.render(scene, camera);
   canvas.dataset.view = raceStarted ? "race" : "menu";
   canvas.dataset.physics = JSON.stringify({ position: player.position.toArray(), velocity: player.velocity.toArray(), airborne: player.airborne, steer: player.steer, triangleCount: physics.triangleCount });
@@ -1728,7 +1768,8 @@ function animate() {
 window.addEventListener("resize", resize);
 window.addEventListener("keydown", (event) => {
   if (!raceStarted) {
-    if (event.target.matches("select, button")) return;
+    if (event.target.matches("select, input, textarea, button")) return;
+    if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)) { event.preventDefault(); keys.set(event.code, true); }
     if (event.code === "ArrowLeft") { event.preventDefault(); selectCar(showroom.selected - 1); }
     if (event.code === "ArrowRight") { event.preventDefault(); selectCar(showroom.selected + 1); }
     if (event.code === "Enter") startBtn.click();
@@ -1743,7 +1784,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyC") cameraMode = (cameraMode + 1) % 3;
 });
 window.addEventListener("keyup", (event) => keys.set(event.code, false));
-window.addEventListener("blur", () => keys.clear());
+window.addEventListener("blur", () => { keys.clear(); showroomDrag = null; });
 
 startBtn.addEventListener("click", async () => {
   if (levelLoading) return;
@@ -1770,6 +1811,7 @@ startBtn.addEventListener("click", async () => {
     startBtn.disabled = false; return;
   }
   startBtn.disabled = false;
+  keys.clear(); showroomDrag = null;
   raceStarted = true;
   startOverlay.classList.add("hidden");
   document.querySelector("#game").classList.remove("menu-open");
@@ -3321,6 +3363,7 @@ export async function loadCar(id, name) {
 </script>
     <script type="text/plain" data-game-module="showroom.js">
 import * as THREE from "three";
+import { ShowroomNavigation } from "./showroom-navigation.js";
 import { gameAssetUrl } from "./assets.js";
 import { loadLevel, loadCar, parsePrm, makeMeshes } from "./revolt.js";
 import { FRONTEND } from "./levels.js";
@@ -3454,6 +3497,7 @@ export class Showroom {
   constructor() {
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x111111);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 800);
+    this.navigation = new ShowroomNavigation(this.camera);
     this.boxes = []; this.selected = 0; this.ray = new THREE.Raycaster();
   }
 
@@ -3471,12 +3515,16 @@ export class Showroom {
     return box ? this.select(box.userData.carIndex) : null;
   }
 
-  render(renderer, dt, aspect) {
+  render(renderer, dt, aspect, keys = new Map()) {
     this.camera.aspect = aspect; this.camera.updateProjectionMatrix();
     // Face the sale-display / magazine-rack corner, rather than the central aisle.
     const portrait = aspect < 1;
-    this.camera.position.set(portrait ? 118 : 145, portrait ? 82 : 76, -134);
-    this.camera.lookAt(256, portrait ? 35 : 28, -134);
+    if (!this.navigation.initialized) {
+      this.camera.position.set(portrait ? 118 : 145, portrait ? 82 : 76, -134);
+      this.camera.lookAt(256, portrait ? 35 : 28, -134);
+      this.navigation.initialized = true;
+    }
+    this.navigation.update(dt, keys);
     for (const [i, box] of this.boxes.entries()) {
       const target = i === this.selected ? new THREE.Vector3(225, portrait ? 49 : 42, portrait ? -134 : -112) : box.userData.home;
       box.position.lerp(target, 1 - Math.exp(-dt * 9));
@@ -3489,7 +3537,6 @@ export class Showroom {
     renderer.render(this.scene, this.camera);
   }
 }
-
 </script>
     <script type="text/plain" data-game-module="skid-marks.js">
 import * as THREE from "three";
