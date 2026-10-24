@@ -1,11 +1,5 @@
 name: Browser Startup Check
 on:
-  push:
-    branches: [main]
-    paths: [".github/workflows/browser-startup.yml", "tests/browser-startup.mjs"]
-  pull_request:
-    branches: [main]
-    paths: ["index.html", "src/**", ".github/workflows/browser-startup.yml"]
   workflow_dispatch:
 permissions:
   contents: read

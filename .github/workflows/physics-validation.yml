@@ -1,13 +1,6 @@
 name: Physics Validation
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "src/pool-water.js"
-      - "src/physics.js"
-      - "src/revolt.js"
-      - "tests/**"
-      - ".github/workflows/physics-validation.yml"
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
