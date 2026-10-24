@@ -521,3 +521,33 @@ for (const id of ["rc", "cougar", "sugo"]) test(`${id} turns strongly while acce
     assert.ok(car.body.translation().x > 10, `${id}: car must actually follow the turn`);
   } finally { globalThis.fetch = savedFetch; physics?.dispose(); mesh?.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }
 });
+
+for (const id of ["phat", "candy", "tc5", "tc4", "tc3", "amw", "tc2"]) test(`${id} rear-wheel drive launches without wheelies and still turns`, async () => {
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = async url => new Response(readFileSync(String(url).slice(1)));
+  let physics, mesh;
+  try {
+    const ground = new THREE.Group(); box(ground,[3000,1,3000],[0,-.5,0]);
+    physics = new MeshPhysics(ground); mesh = await loadCar(id,id);
+    const car = physics.createCar(mesh, { autoRighting: false });
+    assert.ok(car.setup.wheels.some(w => w.powered));
+    assert.ok(!car.setup.wheels.some(w => w.powered && w.position.z > 0));
+    physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion());
+    for (let frame=0;frame<120;frame++) { physics.updateVehicle(car,1/120,0,0,0,false,1,2.1); physics.step(); }
+    let lift=0;
+    for (let frame=0;frame<360;frame++) {
+      physics.updateVehicle(car,1/120,1,0,0,false,1,2.1); physics.step();
+      lift=Math.max(lift,new THREE.Vector3(0,0,1).applyQuaternion(car.body.rotation()).y);
+    }
+    assert.ok(lift<.2,`${id}: nose lift ${lift}`);
+    assert.ok(car.body.linvel().z>100,`${id}: lost acceleration`);
+    for (let frame=0;frame<96;frame++) { physics.updateVehicle(car,1/120,1,0,1,false,1,2.1); physics.step(); }
+    const direction=new THREE.Vector3(0,0,1).applyQuaternion(car.body.rotation());
+    assert.ok(Math.abs(Math.atan2(direction.x,direction.z))>.5,`${id}: insufficient steering under throttle`);
+    car.body.setTranslation({x:0,y:100,z:0},true);
+    car.body.setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-.3),true);
+    car.body.setAngvel({x:-2,y:0,z:0},true);
+    physics.updateVehicle(car,1/120,1,0,0,false,1,2.1);
+    assert.ok(Math.abs(car.body.angvel().x+2)<.001,`${id}: airborne pitch must remain free`);
+  } finally { globalThis.fetch=savedFetch; physics?.dispose(); mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();}); }
+});
