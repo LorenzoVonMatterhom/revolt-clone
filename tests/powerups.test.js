@@ -512,7 +512,7 @@ test("oil coats the wheels touching the slick and the coating expires with low f
   } finally {f.cleanup();}
 });
 
-test("a real car crossing freshly dropped oil immediately leaves full-width oily tire marks", async () => {
+test("a real car crossing freshly dropped oil immediately leaves narrow oily tire marks", async () => {
   const f=fixture(), savedFetch=globalThis.fetch;
   globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
   const marks=new SkidMarks(f.system.scene);
@@ -534,6 +534,6 @@ test("a real car crossing freshly dropped oil immediately leaves full-width oily
     assert.ok(target.powerups.oilWheels.some(time=>time>0),"A following car must pick up fresh oil before 0.7 seconds");
     assert.ok(marks.count>10,"Real wheel contacts must produce visible trail geometry");
     const edge=new THREE.Vector3().fromArray(marks.positions,0).distanceTo(new THREE.Vector3().fromArray(marks.positions,3));
-    assert.ok(edge>=.8,"Oil tracks should span the tire tread, not a thin skid line");
+    assert.ok(edge>=.35 && edge<.8,"Oil tracks should stay narrow and visible");
   } finally {globalThis.fetch=savedFetch;marks.dispose();f.cleanup();mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
 });
