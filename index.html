@@ -956,6 +956,27 @@ export class LapProgress {
   }
 }
 </script>
+<script type="text/plain" data-game-module="audio-lifecycle.js">
+// Mute the shared audio graph directly: animation frames may stop in Android's
+// background tabs while looping Web Audio sources keep playing.
+export function installAudioLifecycle(listener, win, doc, isMuted) {
+  let focused = doc.hasFocus();
+  let pageHidden = false;
+  const update = () => {
+    const gain = listener.gain.gain;
+    const now = listener.context.currentTime;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(doc.hidden || pageHidden || !focused || isMuted() ? 0 : 1, now);
+  };
+  win.addEventListener("blur", () => { focused = false; update(); });
+  win.addEventListener("focus", () => { focused = true; update(); });
+  win.addEventListener("pagehide", () => { pageHidden = true; update(); });
+  win.addEventListener("pageshow", () => { pageHidden = false; focused = doc.hasFocus(); update(); });
+  doc.addEventListener("visibilitychange", update);
+  update();
+  return { update };
+}
+</script>
 <script type="text/plain" data-game-module="main.js">
 
 
@@ -963,6 +984,7 @@ const __REVOLT_FILES__ = ["/levels/bot_bat/bot_bat.ncp","/levels/bot_bat/bot_bat
 import { createTouchControls } from "./touch-controls.js";
 import { gameAssetUrl } from "./assets.js";
 import * as THREE from "three";
+import { installAudioLifecycle } from "./audio-lifecycle.js";
 import { LEVELS } from "./levels.js";
 import { loadLevel, loadCar, disposeLevel, RV_SCALE } from "./revolt.js";
 import { initializePhysics, MeshPhysics, keyboardSteering } from "./physics.js";
@@ -1038,6 +1060,7 @@ camera.position.set(0, 18, -28);
 
 const listener = new THREE.AudioListener();
 camera.add(listener);
+const audioLifecycle = installAudioLifecycle(listener, window, document, () => muted);
 const audioLoader = new THREE.AudioLoader();
 const engineBuffers = new Map();
 
@@ -1769,6 +1792,7 @@ nextLevelBtn.addEventListener("click", () => {
 });
 muteBtn.addEventListener("click", () => {
   muted = !muted;
+  audioLifecycle.update();
   muteBtn.textContent = muted ? "Muted" : "Sound";
   if (muted && sounds.skid.isPlaying) sounds.skid.stop();
   if (muted && sounds.hit.isPlaying) sounds.hit.stop();

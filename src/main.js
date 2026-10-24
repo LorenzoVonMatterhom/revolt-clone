@@ -3,6 +3,7 @@ import "./touch-controls.css";
 import { createTouchControls } from "./touch-controls.js";
 import { gameAssetUrl } from "./assets.js";
 import * as THREE from "three";
+import { installAudioLifecycle } from "./audio-lifecycle.js";
 import { LEVELS } from "./levels.js";
 import { loadLevel, loadCar, disposeLevel, RV_SCALE } from "./revolt.js";
 import { initializePhysics, MeshPhysics, keyboardSteering } from "./physics.js";
@@ -78,6 +79,7 @@ camera.position.set(0, 18, -28);
 
 const listener = new THREE.AudioListener();
 camera.add(listener);
+const audioLifecycle = installAudioLifecycle(listener, window, document, () => muted);
 const audioLoader = new THREE.AudioLoader();
 const engineBuffers = new Map();
 
@@ -809,6 +811,7 @@ nextLevelBtn.addEventListener("click", () => {
 });
 muteBtn.addEventListener("click", () => {
   muted = !muted;
+  audioLifecycle.update();
   muteBtn.textContent = muted ? "Muted" : "Sound";
   if (muted && sounds.skid.isPlaying) sounds.skid.stop();
   if (muted && sounds.hit.isPlaying) sounds.hit.stop();
