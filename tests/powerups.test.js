@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { SkidMarks } from "../src/skid-marks.js";
 import { FlexibleAntenna } from "../src/car-effects.js";
 import { LEVELS } from "../src/levels.js";
 import { parseObjects, parseInfo, loadCar } from "../src/revolt.js";
@@ -509,4 +510,30 @@ test("oil coats the wheels touching the slick and the coating expires with low f
     touches=false;f.system.update(4.01,f.racers);
     assert.equal(other.powerups.oilWheels[0],0);assert.equal(other.powerups.slippery,0);
   } finally {f.cleanup();}
+});
+
+test("a real car crossing freshly dropped oil immediately leaves full-width oily tire marks", async () => {
+  const f=fixture(), savedFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  const marks=new SkidMarks(f.system.scene);
+  let mesh;
+  try {
+    mesh=await loadCar("rc","RC Bandit");
+    const car=f.physics.createCar(mesh);
+    f.physics.placeCar(car,new THREE.Vector3(5,0,-40),new THREE.Quaternion());
+    const target={mesh,position:mesh.position,velocity:new THREE.Vector3(),car,sliding:false,isPlayer:true,powerups:createPowerState()};
+    for(let frame=0;frame<120;frame++){f.physics.updateVehicle(car,1/120,0,0,0,false);f.physics.step();}
+    target.position.copy(car.body.translation());
+    awardPowerup(f.racers[0].powerups,power("oil"),false);f.system.fire(f.racers[0],f.racers);
+    car.body.setLinvel({x:0,y:0,z:90},true);
+    for(let frame=0;frame<66;frame++){
+      f.physics.updateVehicle(car,1/120,0,0,0,false,target.powerups.slippery>0?.025:1,2.1);f.physics.step();
+      target.position.copy(car.body.translation());mesh.quaternion.copy(car.body.rotation());
+      f.system.update(1/120,[target]);marks.track(target);
+    }
+    assert.ok(target.powerups.oilWheels.some(time=>time>0),"A following car must pick up fresh oil before 0.7 seconds");
+    assert.ok(marks.count>10,"Real wheel contacts must produce visible trail geometry");
+    const edge=new THREE.Vector3().fromArray(marks.positions,0).distanceTo(new THREE.Vector3().fromArray(marks.positions,3));
+    assert.ok(edge>=.8,"Oil tracks should span the tire tread, not a thin skid line");
+  } finally {globalThis.fetch=savedFetch;marks.dispose();f.cleanup();mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
 });
