@@ -261,7 +261,6 @@ export class MeshPhysics {
     const speedMultiplier = 2;
     const topSpeed = speedMultiplier * (throttle < 0 ? 35 : 90) * Math.max(1, Math.abs(throttle));
     const motorTorque = 1 - THREE.MathUtils.smoothstep(driveSpeed, topSpeed * 0.5, topSpeed);
-    const speedSteering = steeringGain > 1 ? Math.max(0.4, 1 / (1 + (Math.abs(speed) / 55) ** 2)) : 1;
     const totalDriveRatio=car.setup.wheels.reduce((sum,wheel)=>sum+((wheel.powered??true)?(wheel.engineRatio??1):0),0);
     for (let i = 0; i < car.vehicle.numWheels(); i++) {
       const front = car.setup.wheels[i].position.z > 0;
@@ -269,7 +268,7 @@ export class MeshPhysics {
       // Give player cars usable lock even when stock ratios are small (Cougar: 0.25).
       const steerRatio = steeringGain > 1 ? Math.max(0.45, wheel.steerRatio ?? 0.45) : (wheel.steerRatio ?? 0.45);
       const steeringLimit = steeringGain > 1 ? 1.05 : 0.8;
-      car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * steerRatio * steeringGain * speedSteering, -steeringLimit, steeringLimit) : 0);
+      car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * steerRatio * steeringGain, -steeringLimit, steeringLimit) : 0);
       car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * motorTorque * 360 * speedMultiplier * (1 - 0.65 * waterFraction) * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
       car.vehicle.setWheelBrake(i, brake * 18 + (handbrake && !front ? 30 : 0));
       car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction * (1 - 0.6 * waterFraction));
