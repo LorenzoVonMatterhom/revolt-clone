@@ -267,7 +267,7 @@ select:focus-visible {
 .debug-panel select { width: 100%; max-width: none; font-size: 13px; }
 .debug-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin-top: 8px; }
 .debug-actions button { padding: 0 6px; font-size: 13px; border-radius: 4px; }
-.debug-panel output { display: block; margin-top: 8px; min-height: 18px; font-size: 12px; color: #f1c94b; overflow-wrap: anywhere; }
+.debug-panel #debugStatus { display: block; margin-top: 8px; min-height: 18px; font-size: 12px; color: #f1c94b; overflow-wrap: anywhere; }
 @media (max-width:760px) { .debug-panel { top: 276px; width: 220px; padding: 10px; } }
 .start h2 { font-size: 20px; text-transform: uppercase; color: #f1c94b; margin: 24px 0 12px; }
 .start h3 { font-size: 20px; color: #f1c94b; margin: 20px 0 14px; }
@@ -454,7 +454,7 @@ select:focus-visible {
           <button id="debugUse" type="button">Use</button>
           <button id="debugClear" type="button">Clear</button>
         </div>
-        <output id="debugStatus" aria-live="polite">No Pick Up</output>
+        <div id="debugStatus">No Pick Up</div>
       </section>
       <div class="hud powerup-slot">
         <button id="powerBtn" type="button" disabled aria-label="Use power-up" title="Use power-up (F or left Ctrl)"><canvas id="powerIcon" width="64" height="64" aria-hidden="true"></canvas></button>
