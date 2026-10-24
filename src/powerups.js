@@ -116,8 +116,8 @@ export class PowerupSystem {
     this.group.add(mesh); this.effects.push({ mesh, life: 0.16, bolt: true, unique: true });
   }
 
-  explode(position, racers, owner = null, radius = 20) {
-    this.flash(position); this.playSound("firebang", position);
+  explode(position, racers, owner = null, radius = 20, sound = "puttbang") {
+    this.flash(position); this.playSound(sound, position);
     for (const racer of racers) {
       const distance = racer.position.distanceTo(position);
       if (distance > radius || (owner === racer && distance > 6)) continue;
@@ -136,7 +136,8 @@ export class PowerupSystem {
     mesh.position.copy(racer.position).addScaledVector(forward, 12); mesh.position.y += 3;
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward);
     this.group.add(mesh);
-    const projectileSpeed = kind === "balloons" ? 85 : 105;
+    // Fireworks must be able to catch the doubled-speed cars.
+    const projectileSpeed = kind === "balloons" ? 85 : kind === "firework" ? 210 : 105;
     const launchLift = kind === "balloons" ? 26 : 0;
     const entity = { mesh, owner: racer, kind, velocity: forward.multiplyScalar(projectileSpeed).add(racer.velocity), life: kind === "shockwave" ? 10 : 5, unique: kind === "shockwave", bounces: 0, previousVy: launchLift, hitCars: new Set() };
     if (kind === "balloons") {
@@ -289,6 +290,34 @@ export class PowerupSystem {
     });
   }
 
+  steerFirework(projectile, dt, racers) {
+    const position = projectile.mesh.position;
+    let closest = Infinity;
+    projectile.target = null;
+    for (const racer of racers) {
+      if (racer === projectile.owner || racer.finished) continue;
+      const distance = racer.position.distanceToSquared(position);
+      if (distance < closest) { closest = distance; projectile.target = racer; }
+    }
+    if (!projectile.target) return;
+    const speed = projectile.velocity.length();
+    if (speed < 0.001) return;
+    const distance = Math.sqrt(closest);
+    const aim = projectile.target.position.clone().add(new THREE.Vector3(0, 2, 0))
+      .addScaledVector(projectile.target.velocity, Math.min(0.75, distance / speed)).sub(position);
+    // Turn tightly near the target instead of circling it. Preserve flight speed
+    // through turns and steer yaw separately so U-turns do not dive underground.
+    const turn = Math.max(8, speed * 1.5 / Math.max(8, distance)) * dt;
+    const yaw = Math.atan2(projectile.velocity.x, projectile.velocity.z);
+    const desiredYaw = Math.atan2(aim.x, aim.z);
+    const yawDelta = Math.atan2(Math.sin(desiredYaw - yaw), Math.cos(desiredYaw - yaw));
+    const heading = yaw + THREE.MathUtils.clamp(yawDelta, -turn, turn);
+    const pitch = Math.atan2(projectile.velocity.y, Math.hypot(projectile.velocity.x, projectile.velocity.z));
+    const desiredPitch = Math.atan2(aim.y, Math.hypot(aim.x, aim.z));
+    const elevation = pitch + THREE.MathUtils.clamp(desiredPitch - pitch, -turn, turn);
+    projectile.velocity.set(Math.sin(heading) * Math.cos(elevation), Math.sin(elevation), Math.cos(heading) * Math.cos(elevation)).multiplyScalar(speed);
+  }
+
   updateProjectiles(dt, racers) {
     for (const projectile of this.projectiles) {
       projectile.life -= dt;
@@ -300,11 +329,7 @@ export class PowerupSystem {
         projectile.previousVy = vy;
         if (projectile.bounces > 1) projectile.life = 0;
       } else {
-        if (projectile.kind === "firework") {
-          const direction = projectile.velocity.clone().normalize();
-          const target = racers.filter((r) => r !== projectile.owner && r.position.clone().sub(previous).normalize().dot(direction) > 0.5).sort((a, b) => a.position.distanceToSquared(previous) - b.position.distanceToSquared(previous))[0];
-          if (target && target.position.distanceTo(previous) < 160) projectile.velocity.lerp(target.position.clone().add(new THREE.Vector3(0, 2, 0)).sub(previous).normalize().multiplyScalar(105), Math.min(1, dt * 1.2));
-        }
+        if (projectile.kind === "firework") this.steerFirework(projectile, dt, racers);
         projectile.mesh.position.addScaledVector(projectile.velocity, dt);
         projectile.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), projectile.velocity.clone().normalize());
         const segment = projectile.mesh.position.clone().sub(previous);
@@ -324,7 +349,7 @@ export class PowerupSystem {
       if (projectile.life <= 0 && projectile.kind === "balloons") {
         this.flash(projectile.mesh.position, 0x88dfff, 15); this.playSound("wbombhit", projectile.mesh.position);
         for (const racer of racers) if (racer.position.distanceTo(projectile.mesh.position) < 22) racer.powerups.slippery = 4;
-      } else if (projectile.life <= 0 && projectile.kind === "firework") this.explode(projectile.mesh.position, racers, projectile.owner);
+      } else if (projectile.life <= 0 && projectile.kind === "firework") this.explode(projectile.mesh.position, racers, projectile.owner, 20, "firebang");
     }
     this.projectiles = this.projectiles.filter((projectile) => { if (projectile.life > 0) return true; this.remove(projectile); return false; });
   }
