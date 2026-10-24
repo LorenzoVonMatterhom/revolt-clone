@@ -387,3 +387,27 @@ test("bomb makes textured, emissive and multi-material car parts solid black and
     assert.equal(part.material[0], bright);
   } finally { f.cleanup(); texture.dispose(); }
 });
+
+test("battery adds a reusable orange surface shader and restores the car on expiry and reset", () => {
+  const f = fixture(), racer = f.racers[0], original = racer.mesh.material;
+  try {
+    awardPowerup(racer.powerups, power("battery"), false); f.system.fire(racer, f.racers);
+    const glow = racer.mesh.userData.batteryGlow;
+    assert.ok(glow.material.isShaderMaterial);
+    assert.equal(glow.meshes[0].geometry, racer.mesh.geometry);
+    assert.equal(glow.meshes[0].parent, racer.mesh);
+    assert.equal(racer.mesh.material, original);
+    f.system.update(.1, f.racers);
+    assert.equal(racer.mesh.userData.batteryGlow, glow);
+    assert.ok(glow.material.uniforms.time.value > 0);
+    f.system.update(8, f.racers);
+    assert.equal(racer.mesh.userData.batteryGlow, undefined);
+    assert.equal(glow.meshes[0].parent, null);
+    f.system.debugGive(racer, "battery"); f.system.fire(racer, f.racers);
+    f.system.reset(f.racers); assert.equal(racer.mesh.userData.batteryGlow, undefined);
+    f.system.debugGive(racer, "battery"); f.system.fire(racer, f.racers);
+    racer.powerups.bomb = 5; f.system.update(.01, f.racers);
+    assert.equal(racer.mesh.userData.batteryGlow, undefined);
+    assert.equal(racer.mesh.material.color.getHex(), 0);
+  } finally { f.cleanup(); }
+});

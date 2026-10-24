@@ -151,6 +151,16 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await page.waitForTimeout(300);
     if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
     console.log(name, "Electro pulse rendered without shader errors");
+    await page.evaluate(() => {
+      const select = document.querySelector("#debugPowerup");
+      select.value = "battery"; select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held === "battery");
+    await fire.tap();
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).boost > 0);
+    await page.waitForTimeout(300);
+    if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
+    console.log(name, "Orange battery glow rendered without shader errors");
     await page.locator("#menuBtn").tap();
     await page.locator("#menuTrack").selectOption("ship2");
     await page.waitForFunction(() => window.revoltMap?.id === "ship2" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
