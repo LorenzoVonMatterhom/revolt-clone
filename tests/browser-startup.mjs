@@ -182,7 +182,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       const finish = await page.evaluate(() => window.__lapTest.drive(0, 1));
       if (!finish.finished || finish.hud !== "3/3") throw new Error(`${track}: third lap did not finish: ${JSON.stringify(finish)}`);
       console.log(name, track, "HUD advances 1/3 → 2/3 → 3/3 and finishes; Reset preserves checkpoints");
-      await page.locator("#menuBtn").tap();
+      if (track !== "nhood2") await page.locator("#menuBtn").tap();
     }
     if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
   } finally { await browser.close(); }
