@@ -295,7 +295,7 @@ class CarController {
     this.progress = 0;
     this.lastTrackIndex = 0;
     this.placeScore = 0;
-    this.lapTracker = this.isPlayer ? new LapProgress(checkpoints, TOTAL_LAPS) : null;
+    this.lapTracker = new LapProgress(checkpoints, TOTAL_LAPS);
     this.resetTo(0, options.startOffset || 0, (samples - (options.startIndex || samples)) / 6);
   }
 
@@ -420,25 +420,13 @@ class CarController {
 
   updateProgress(trackData) {
     if (!checkpoints.length) return;
-    if (!this.isPlayer) {
-      this.lastTrackIndex = trackData.index;
-      this.lap = this.ai.laps + 1;
-      this.progress = this.ai.distance / this.ai.length;
-      this.placeScore = (this.ai.laps + this.progress) * samples;
-      if(this.ai.laps>=TOTAL_LAPS&&!this.finished) {
-        this.finished=true;
-        physics.updateVehicle(this.car,PHYSICS_STEP,0,1,0,false);
-        physics.parkCar(this.car);this.syncPhysics();
-      }
-      return;
-    }
     this.lapTracker.update(this.position);
     this.lap = this.lapTracker.lap;
     this.nextCheckpoint = this.lapTracker.nextCheckpoint;
     this.finished = this.lapTracker.finished;
     this.lastTrackIndex = trackData.index;
     this.progress = trackData.index / samples;
-    this.placeScore = (this.lap - 1 + this.progress) * samples;
+    this.placeScore = this.lapTracker.score(this.position);
     if (this.finished) physics.updateVehicle(this.car, PHYSICS_STEP, 0, 1, 0, false);
   }
 

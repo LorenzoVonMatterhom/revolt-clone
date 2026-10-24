@@ -122,3 +122,14 @@ for(const definition of LEVELS.filter(level=>level.kind==='race'&&level.id!=='st
     }
   });
 }
+
+ test("race position compares all cars using earned gates and forward progress", () => {
+  const gates = makeLapGates(points, forward);
+  const leader = new LapProgress(gates), follower = new LapProgress(gates);
+  travel(leader, route, 0, .4); travel(follower, route, 0, .2);
+  assert.ok(leader.score(route.getPointAt(.4)) > follower.score(route.getPointAt(.2)));
+  travel(follower, route, .2, .6);
+  assert.ok(follower.score(route.getPointAt(.6)) > leader.score(route.getPointAt(.4)));
+  travel(leader, route, .4, 1);
+  assert.ok(leader.score(route.getPointAt(0)) > follower.score(route.getPointAt(.6)));
+});

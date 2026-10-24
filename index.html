@@ -908,6 +908,19 @@ export class LapProgress {
   // Repositioning preserves earned gates but must not count as crossing one.
   relocate(position) { this.previous = position.clone(); }
 
+  score(position) {
+    if (this.finished) return this.totalLaps * this.gates.length;
+    if (!this.gates.length) return 0;
+    const next = this.nextCheckpoint;
+    const completed = next === 0 ? this.gates.length - 1 : next - 1;
+    const previous = this.gates[completed].position;
+    const ahead = this.gates[next].position;
+    const behindDistance = position.distanceTo(previous);
+    const aheadDistance = position.distanceTo(ahead);
+    const fraction = behindDistance / Math.max(0.001, behindDistance + aheadDistance);
+    return (this.lap - 1) * this.gates.length + completed + fraction;
+  }
+
   update(position) {
     if (this.finished || this.gates.length < 2 || !this.previous) {
       this.relocate(position);
@@ -1242,7 +1255,7 @@ class CarController {
     this.progress = 0;
     this.lastTrackIndex = 0;
     this.placeScore = 0;
-    this.lapTracker = this.isPlayer ? new LapProgress(checkpoints, TOTAL_LAPS) : null;
+    this.lapTracker = new LapProgress(checkpoints, TOTAL_LAPS);
     this.resetTo(0, options.startOffset || 0, (samples - (options.startIndex || samples)) / 6);
   }
 
@@ -1367,25 +1380,13 @@ class CarController {
 
   updateProgress(trackData) {
     if (!checkpoints.length) return;
-    if (!this.isPlayer) {
-      this.lastTrackIndex = trackData.index;
-      this.lap = this.ai.laps + 1;
-      this.progress = this.ai.distance / this.ai.length;
-      this.placeScore = (this.ai.laps + this.progress) * samples;
-      if(this.ai.laps>=TOTAL_LAPS&&!this.finished) {
-        this.finished=true;
-        physics.updateVehicle(this.car,PHYSICS_STEP,0,1,0,false);
-        physics.parkCar(this.car);this.syncPhysics();
-      }
-      return;
-    }
     this.lapTracker.update(this.position);
     this.lap = this.lapTracker.lap;
     this.nextCheckpoint = this.lapTracker.nextCheckpoint;
     this.finished = this.lapTracker.finished;
     this.lastTrackIndex = trackData.index;
     this.progress = trackData.index / samples;
-    this.placeScore = (this.lap - 1 + this.progress) * samples;
+    this.placeScore = this.lapTracker.score(this.position);
     if (this.finished) physics.updateVehicle(this.car, PHYSICS_STEP, 0, 1, 0, false);
   }
 

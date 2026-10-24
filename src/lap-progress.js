@@ -52,6 +52,19 @@ export class LapProgress {
   // Repositioning preserves earned gates but must not count as crossing one.
   relocate(position) { this.previous = position.clone(); }
 
+  score(position) {
+    if (this.finished) return this.totalLaps * this.gates.length;
+    if (!this.gates.length) return 0;
+    const next = this.nextCheckpoint;
+    const completed = next === 0 ? this.gates.length - 1 : next - 1;
+    const previous = this.gates[completed].position;
+    const ahead = this.gates[next].position;
+    const behindDistance = position.distanceTo(previous);
+    const aheadDistance = position.distanceTo(ahead);
+    const fraction = behindDistance / Math.max(0.001, behindDistance + aheadDistance);
+    return (this.lap - 1) * this.gates.length + completed + fraction;
+  }
+
   update(position) {
     if (this.finished || this.gates.length < 2 || !this.previous) {
       this.relocate(position);
