@@ -2449,7 +2449,7 @@ export function choosePowerup(place, count, cpu, random = Math.random) {
   return POWERUPS[9];
 }
 export function createPowerState() {
-  return { held: null, shots: 0, rolling: 0, cooldown: 0, boost: 0, disabled: 0, slippery: 0, electro: 0, bomb: 0, bombLock: 0 };
+  return { held: null, shots: 0, rolling: 0, cooldown: 0, boost: 0, disabled: 0, slippery: 0, oilWheels: [], electro: 0, bomb: 0, bombLock: 0 };
 }
 export function awardPowerup(state, powerup, roulette = true) {
   if (state.held || state.rolling > 0 || (state.bomb > 0 && powerup.id === "bomb")) return false;
@@ -2664,6 +2664,7 @@ export class PowerupSystem {
     for (const racer of racers) {
       const state = racer.powerups ??= createPowerState();
       for (const key of ["cooldown", "boost", "disabled", "slippery", "electro", "bombLock"]) state[key] = Math.max(0, state[key] - dt);
+      state.oilWheels = (state.oilWheels ?? []).map(time => Math.max(0, time - dt));
       if (state.rolling > 0) {
         state.rolling = Math.max(0, state.rolling - dt);
         if (state.rolling === 0 && state.held?.id === "bomb") { state.bomb = 10; state.held = null; state.shots = 0; this.playSound("fuse", racer.position); }
@@ -2722,6 +2723,21 @@ export class PowerupSystem {
       if (hazard.body) { hazard.mesh.position.copy(hazard.body.translation()); hazard.mesh.quaternion.copy(hazard.body.rotation()); }
       if (hazard.kind === "clone") hazard.mesh.rotation.y += dt * 2;
       if (hazard.armed <= 0 && hazard.kind !== "bearing") for (const racer of racers) {
+        if (hazard.kind === "oil") {
+          const vehicle = racer.car.vehicle;
+          let touched = false;
+          for (let i = 0; i < (vehicle?.numWheels() ?? 0); i++) {
+            if (!vehicle.wheelIsInContact(i)) continue;
+            const point = vehicle.wheelContactPoint(i);
+            if (!point || Math.abs(point.y - hazard.mesh.position.y) > 3) continue;
+            const width = racer.car.setup.wheels[i].halfWidth ?? 0.5;
+            if (Math.hypot(point.x - hazard.mesh.position.x, point.z - hazard.mesh.position.z) > 8 + width) continue;
+            racer.powerups.oilWheels[i] = 4; touched = true;
+          }
+          if (!vehicle && racer.position.distanceTo(hazard.mesh.position) < 10) touched = true;
+          if (touched) racer.powerups.slippery = 4;
+          continue;
+        }
         const delta = racer.position.clone().sub(hazard.mesh.position);
         if (Math.abs(delta.y) < 8 && Math.hypot(delta.x, delta.z) < 10) {
           if (hazard.kind === "clone") { this.explode(hazard.mesh.position, racers); hazard.life = 0; break; }
@@ -3717,6 +3733,7 @@ export class SkidMarks {
   constructor(scene, capacity = 2048) {
     this.scene = scene; this.capacity = capacity; this.count = 0; this.next = 0;
     this.previous = new Map(); this.ages = new Float32Array(capacity).fill(40);
+    this.opacity = new Float32Array(capacity).fill(0.6);
     this.positions = new Float32Array(capacity * 18);
     this.colors = new Float32Array(capacity * 24);
     this.geometry = new THREE.BufferGeometry();
@@ -3729,7 +3746,7 @@ export class SkidMarks {
     scene.add(this.mesh);
   }
 
-  segment(from, to, normal, width) {
+  segment(from, to, normal, width, opacity = 0.6) {
     const direction = to.clone().sub(from);
     const distance = direction.length();
     if (distance < 0.15 || distance > 8) return false;
@@ -3739,8 +3756,9 @@ export class SkidMarks {
     const slot = this.next; this.next = (slot + 1) % this.capacity;
     [0,1,2,0,2,3].forEach((corner, i) => {
       corners[corner].toArray(this.positions, slot * 18 + i * 3);
-      this.colors.set([1,1,1,0.6], slot * 24 + i * 4);
+      this.colors.set([1,1,1,opacity], slot * 24 + i * 4);
     });
+    this.opacity[slot] = opacity;
     this.ages[slot] = 0; this.count = Math.min(this.capacity, this.count + 1);
     this.geometry.setDrawRange(0, this.count * 6);
     this.geometry.attributes.position.needsUpdate = true; this.geometry.attributes.color.needsUpdate = true;
@@ -3748,17 +3766,20 @@ export class SkidMarks {
   }
 
   track(racer) {
-    if (!racer.sliding || racer.finished) { this.previous.delete(racer); return; }
+    const oily = racer.powerups?.slippery > 0 && racer.powerups.oilWheels?.some(time => time > 0);
+    if ((!racer.sliding && !oily) || racer.finished) { this.previous.delete(racer); return; }
     const previous = this.previous.get(racer) ?? [];
     const vehicle = racer.car.vehicle;
     for (let i = 0; i < vehicle.numWheels(); i++) {
+      const oiledWheel = oily && racer.powerups.oilWheels[i] > 0;
+      if (!racer.sliding && !oiledWheel) { previous[i] = null; continue; }
       const contact = vehicle.wheelIsInContact(i) && vehicle.wheelContactPoint(i);
       const contactNormal = vehicle.wheelContactNormal(i);
       if (!contact || !contactNormal || contactNormal.y < 0.15) { previous[i] = null; continue; }
       const point = new THREE.Vector3().copy(contact), normal = new THREE.Vector3().copy(contactNormal).normalize();
       if (!previous[i]) previous[i] = point;
       else if (point.distanceTo(previous[i]) > 8) previous[i] = point;
-      else if (this.segment(previous[i], point, normal, Math.max(0.25, racer.car.setup.wheels[i].radius * 0.45))) previous[i] = point;
+      else if (this.segment(previous[i], point, normal, Math.max(0.25, racer.car.setup.wheels[i].radius * 0.45), oiledWheel ? 0.9 : 0.6)) previous[i] = point;
     }
     this.previous.set(racer, previous);
   }
@@ -3766,7 +3787,7 @@ export class SkidMarks {
   update(dt) {
     for (let slot = 0; slot < this.count; slot++) {
       this.ages[slot] += dt;
-      const alpha = 0.6 * THREE.MathUtils.clamp((40 - this.ages[slot]) / 20, 0, 1);
+      const alpha = this.opacity[slot] * THREE.MathUtils.clamp((40 - this.ages[slot]) / 20, 0, 1);
       for (let i = 0; i < 6; i++) this.colors[slot * 24 + i * 4 + 3] = alpha;
     }
     this.geometry.attributes.color.needsUpdate = true;
@@ -3775,8 +3796,7 @@ export class SkidMarks {
   clear() { this.count = 0; this.next = 0; this.previous.clear(); this.geometry.setDrawRange(0, 0); this.ages.fill(40); }
   dispose() { this.scene.remove(this.mesh); this.geometry.dispose(); this.material.dispose(); this.previous.clear(); }
 }
-
-    </script>
+</script>
     <script type="text/plain" data-game-module="touch-controls.js">
 export function bindTouchButton(button, code, pointers, enabled) {
   function release(event) {

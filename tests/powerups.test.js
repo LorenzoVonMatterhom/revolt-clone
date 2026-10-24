@@ -493,3 +493,20 @@ test("bomb countdown burns the real flexible antenna and restores it after explo
     assert.ok(antenna.rods.every(rod=>rod.visible));
   } finally { f.cleanup(); }
 });
+
+test("oil coats the wheels touching the slick and the coating expires with low friction", () => {
+  const f=fixture(),owner=f.racers[0],other=f.racers[1];
+  let touches=true;
+  try {
+    awardPowerup(owner.powerups,power("oil"),false);f.system.fire(owner,f.racers);
+    const oil=f.system.hazards[0];oil.armed=0;
+    other.car.setup={wheels:[{halfWidth:.5},{halfWidth:.5}]};
+    other.car.vehicle={numWheels:()=>2,wheelIsInContact:()=>touches,
+      wheelContactPoint:i=>({x:oil.mesh.position.x+i*20,y:oil.mesh.position.y,z:oil.mesh.position.z})};
+    f.system.update(.01,f.racers);
+    assert.equal(other.powerups.oilWheels[0],4);
+    assert.ok(!(other.powerups.oilWheels[1]>0));assert.equal(other.powerups.slippery,4);
+    touches=false;f.system.update(4.01,f.racers);
+    assert.equal(other.powerups.oilWheels[0],0);assert.equal(other.powerups.slippery,0);
+  } finally {f.cleanup();}
+});

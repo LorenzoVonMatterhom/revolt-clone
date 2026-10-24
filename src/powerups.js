@@ -27,7 +27,7 @@ export function choosePowerup(place, count, cpu, random = Math.random) {
   return POWERUPS[9];
 }
 export function createPowerState() {
-  return { held: null, shots: 0, rolling: 0, cooldown: 0, boost: 0, disabled: 0, slippery: 0, electro: 0, bomb: 0, bombLock: 0 };
+  return { held: null, shots: 0, rolling: 0, cooldown: 0, boost: 0, disabled: 0, slippery: 0, oilWheels: [], electro: 0, bomb: 0, bombLock: 0 };
 }
 export function awardPowerup(state, powerup, roulette = true) {
   if (state.held || state.rolling > 0 || (state.bomb > 0 && powerup.id === "bomb")) return false;
@@ -242,6 +242,7 @@ export class PowerupSystem {
     for (const racer of racers) {
       const state = racer.powerups ??= createPowerState();
       for (const key of ["cooldown", "boost", "disabled", "slippery", "electro", "bombLock"]) state[key] = Math.max(0, state[key] - dt);
+      state.oilWheels = (state.oilWheels ?? []).map(time => Math.max(0, time - dt));
       if (state.rolling > 0) {
         state.rolling = Math.max(0, state.rolling - dt);
         if (state.rolling === 0 && state.held?.id === "bomb") { state.bomb = 10; state.held = null; state.shots = 0; this.playSound("fuse", racer.position); }
@@ -300,6 +301,21 @@ export class PowerupSystem {
       if (hazard.body) { hazard.mesh.position.copy(hazard.body.translation()); hazard.mesh.quaternion.copy(hazard.body.rotation()); }
       if (hazard.kind === "clone") hazard.mesh.rotation.y += dt * 2;
       if (hazard.armed <= 0 && hazard.kind !== "bearing") for (const racer of racers) {
+        if (hazard.kind === "oil") {
+          const vehicle = racer.car.vehicle;
+          let touched = false;
+          for (let i = 0; i < (vehicle?.numWheels() ?? 0); i++) {
+            if (!vehicle.wheelIsInContact(i)) continue;
+            const point = vehicle.wheelContactPoint(i);
+            if (!point || Math.abs(point.y - hazard.mesh.position.y) > 3) continue;
+            const width = racer.car.setup.wheels[i].halfWidth ?? 0.5;
+            if (Math.hypot(point.x - hazard.mesh.position.x, point.z - hazard.mesh.position.z) > 8 + width) continue;
+            racer.powerups.oilWheels[i] = 4; touched = true;
+          }
+          if (!vehicle && racer.position.distanceTo(hazard.mesh.position) < 10) touched = true;
+          if (touched) racer.powerups.slippery = 4;
+          continue;
+        }
         const delta = racer.position.clone().sub(hazard.mesh.position);
         if (Math.abs(delta.y) < 8 && Math.hypot(delta.x, delta.z) < 10) {
           if (hazard.kind === "clone") { this.explode(hazard.mesh.position, racers); hazard.life = 0; break; }
