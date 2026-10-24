@@ -1063,6 +1063,52 @@ export function updateBatteryGlow(car, active, time, remaining) {
   glow.material.uniforms.strength.value = Math.min(1, remaining * 4);
 }
 </script>
+<script type="text/plain" data-game-module="shockwave-visual.js">
+import * as THREE from "three";
+
+export function createShockwaveVisual() {
+  const size = 64, pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const radius = Math.hypot((x + .5) / size * 2 - 1, (y + .5) / size * 2 - 1);
+    const at = (y * size + x) * 4;
+    pixels[at] = pixels[at + 1] = pixels[at + 2] = 255;
+    pixels[at + 3] = Math.round(Math.max(0, Math.exp(-radius * radius * 5) - Math.exp(-5)) * 255);
+  }
+  const texture = new THREE.DataTexture(pixels, size, size);
+  texture.needsUpdate = true;
+  const group = new THREE.Group(); group.name = "Blue-white shockwave with glowing bead trail";
+  group.userData.shockwaveTexture = texture;
+  group.userData.age = 0;
+  const sprite = (color, scale, opacity) => {
+    const mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, color, opacity,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    mesh.scale.setScalar(scale); group.add(mesh); return mesh;
+  };
+  sprite(0x3265ff, 9, .8);
+  sprite(0xb4deff, 4.5, 1);
+  sprite(0xffffff, 2.5, 1);
+  group.userData.beads = Array.from({ length: 12 }, (_, i) => {
+    const bead = sprite(i < 3 ? 0xcceaff : 0x8c9fff, 2.3 - i * .12, .85 - i * .05);
+    bead.position.set(Math.sin(i * 2.4) * .5, -(i + 1) * 3, Math.cos(i * 1.7) * .5);
+    bead.visible = false; return bead;
+  });
+  return group;
+}
+
+export function updateShockwaveVisual(group, dt, speed) {
+  group.userData.age += dt;
+  group.children[0].scale.setScalar(9 + Math.sin(group.userData.age * 24) * .7);
+  group.userData.beads.forEach((bead, i) => {
+    bead.visible = group.userData.age * speed >= (i + 1) * 3;
+    bead.material.opacity = (.85 - i * .05) * (.8 + .2 * Math.sin(group.userData.age * 18 - i));
+  });
+}
+
+export function disposeShockwaveVisual(group) {
+  group.traverse(part => part.material?.dispose());
+  group.userData.shockwaveTexture.dispose();
+}
+</script>
 <script type="text/plain" data-game-module="main.js">
 
 
@@ -2326,6 +2372,7 @@ export function disposeElectricPulse(car) {
 </script>
 <script type="text/plain" data-game-module="powerups.js">
 import * as THREE from "three";
+import { createShockwaveVisual, updateShockwaveVisual, disposeShockwaveVisual } from "./shockwave-visual.js";
 import { updateBatteryGlow, disposeBatteryGlow } from "./battery-glow.js";
 import { createElectricPulse, disposeElectricPulse } from "./electric-pulse.js";
 import { gameAssetUrl } from "./assets.js";
@@ -2402,7 +2449,8 @@ export class PowerupSystem {
   remove(entity) {
     this.group.remove(entity.mesh);
     if (entity.body) this.physics.world.removeRigidBody(entity.body);
-    if (entity.unique) { entity.mesh.geometry?.dispose(); entity.mesh.material?.dispose(); }
+    if (entity.kind === "shockwave") disposeShockwaveVisual(entity.mesh);
+    else if (entity.unique) { entity.mesh.geometry?.dispose(); entity.mesh.material?.dispose(); }
     if (entity.texture) { entity.mesh.material.dispose(); entity.texture.dispose(); }
   }
 
@@ -2480,7 +2528,7 @@ export class PowerupSystem {
 
   spawnProjectile(racer, kind) {
     const forward = this.forward(racer);
-    const mesh = kind === "shockwave" ? new THREE.Mesh(new THREE.SphereGeometry(2, 12, 8), new THREE.MeshBasicMaterial({ color: 0x54cfff, wireframe: true })) : this.assets.models[kind === "balloons" ? "wbomb" : "firework"].clone(true);
+    const mesh = kind === "shockwave" ? createShockwaveVisual() : this.assets.models[kind === "balloons" ? "wbomb" : "firework"].clone(true);
     if (kind === "balloons") mesh.scale.setScalar(0.4);
     mesh.position.copy(racer.position).addScaledVector(forward, 12); mesh.position.y += 3;
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward);
@@ -2671,6 +2719,7 @@ export class PowerupSystem {
   updateProjectiles(dt, racers) {
     for (const projectile of this.projectiles) {
       projectile.life -= dt;
+      if (projectile.kind === "shockwave") updateShockwaveVisual(projectile.mesh, dt, projectile.velocity.length());
       const previous = projectile.mesh.position.clone();
       if (projectile.body) {
         projectile.mesh.position.copy(projectile.body.translation());
