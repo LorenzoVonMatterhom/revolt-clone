@@ -113,7 +113,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     console.log(name, "touch gas button visible");
     const debug = page.locator("#debugPanel");
     if (!await debug.isVisible() || !await page.locator("#debugPowerup").isVisible()) throw new Error("Power-up debug selector is hidden on mobile");
-    await debug.locator("summary").evaluate(summary => summary.click());
+    console.log(name, "mobile power-up debug selector is visible");
     if (await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not collapse");
     await debug.locator("summary").evaluate(summary => summary.click());
     if (!await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not reopen");
@@ -184,6 +184,11 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await page.locator("#startBtn").tap();
     await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
     console.log(name, "Both Toytanic races loaded with pool water");
+    await page.locator("#debugToggle").evaluate(button => button.click());
+    if (await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not hide");
+    await page.locator("#debugToggle").evaluate(button => button.click());
+    if (!await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not reopen");
+    console.log(name, "power-up debug Show/Hide button works");
     // Give deterministic lap fixtures their own WebGL/physics world. The live
     // driving/power-up smoke test above never resumes a sampled/teleported pose.
     await page.close();

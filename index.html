@@ -338,8 +338,9 @@ select:focus-visible {
   }
 }
 
-.debug-panel summary { cursor: pointer; font-size: 14px; font-weight: 700; color: #f1c94b; min-height: 32px; line-height: 32px; touch-action: manipulation; }
-.debug-panel[open] summary { margin-bottom: 6px; }
+.debug-panel h2 { margin-bottom: 6px; font-size: 14px; }
+.debug-panel h2 button { min-height: 36px; padding: 0 8px; font-size: 12px; }
+.debug-panel.is-collapsed > :not(h2) { display: none; }
 .debug-panel select { min-height: 40px; }
 .debug-panel { z-index: 8; }
 
@@ -444,8 +445,8 @@ select:focus-visible {
       <div class="hud minimap" aria-hidden="true">
         <canvas id="map" width="180" height="180"></canvas>
       </div>
-      <details class="hud debug-panel" id="debugPanel" aria-label="Power-up debug" open>
-        <summary>Power-up debug</summary>
+      <section class="hud debug-panel" id="debugPanel" aria-label="Power-up debug">
+        <h2>Power-up debug <button id="debugToggle" type="button" aria-expanded="true" aria-controls="debugPowerup">Hide</button></h2>
         <label for="debugPowerup">Power-up</label>
         <select id="debugPowerup" aria-label="Debug power-up"></select>
         <div class="debug-actions">
@@ -454,7 +455,7 @@ select:focus-visible {
           <button id="debugClear" type="button">Clear</button>
         </div>
         <output id="debugStatus" aria-live="polite">No Pick Up</output>
-      </details>
+      </section>
       <div class="hud powerup-slot">
         <button id="powerBtn" type="button" disabled aria-label="Use power-up" title="Use power-up (F or left Ctrl)"><canvas id="powerIcon" width="64" height="64" aria-hidden="true"></canvas></button>
         <div><strong id="powerName">No Pick Up</strong><span id="powerStatus" role="status"></span></div>
@@ -1157,6 +1158,11 @@ const powerName = document.querySelector("#powerName");
 const powerStatus = document.querySelector("#powerStatus");
 const debugPowerup = document.querySelector("#debugPowerup");
 const debugStatus = document.querySelector("#debugStatus");
+document.querySelector("#debugToggle").addEventListener("click", event => {
+  const collapsed = document.querySelector("#debugPanel").classList.toggle("is-collapsed");
+  event.currentTarget.textContent = collapsed ? "Show" : "Hide";
+  event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
+});
 let lastPowerIcon;
 let powerups;
 let powerAssets;

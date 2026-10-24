@@ -331,7 +331,8 @@ select:focus-visible {
   }
 }
 
-.debug-panel summary { cursor: pointer; font-size: 14px; font-weight: 700; color: #f1c94b; min-height: 32px; line-height: 32px; touch-action: manipulation; }
-.debug-panel[open] summary { margin-bottom: 6px; }
+.debug-panel h2 { margin-bottom: 6px; font-size: 14px; }
+.debug-panel h2 button { min-height: 36px; padding: 0 8px; font-size: 12px; }
+.debug-panel.is-collapsed > :not(h2) { display: none; }
 .debug-panel select { min-height: 40px; }
 .debug-panel { z-index: 8; }

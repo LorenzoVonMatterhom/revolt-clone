@@ -37,6 +37,11 @@ const powerName = document.querySelector("#powerName");
 const powerStatus = document.querySelector("#powerStatus");
 const debugPowerup = document.querySelector("#debugPowerup");
 const debugStatus = document.querySelector("#debugStatus");
+document.querySelector("#debugToggle").addEventListener("click", event => {
+  const collapsed = document.querySelector("#debugPanel").classList.toggle("is-collapsed");
+  event.currentTarget.textContent = collapsed ? "Show" : "Hide";
+  event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
+});
 let lastPowerIcon;
 let powerups;
 let powerAssets;
