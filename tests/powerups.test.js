@@ -42,7 +42,7 @@ test("electro pulse and shockwave have correct icons and the cannon keeps its sp
   f.cleanup();
 });
 
-function fixture(objects = []) {
+function fixture(objects = [], playSound) {
   const scene = new THREE.Scene();
   const terrain = new THREE.Group();
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshBasicMaterial());
@@ -55,7 +55,7 @@ function fixture(objects = []) {
     physics.world.createCollider(RAPIER.ColliderDesc.cuboid(2, 1, 4).setMass(8), body);
     return { mesh, position: mesh.position, velocity: new THREE.Vector3(), car: { body }, isPlayer: true, placeScore: i, powerups: createPowerState() };
   });
-  const system = new PowerupSystem(scene, physics, terrain, objects, assets);
+  const system = new PowerupSystem(scene, physics, terrain, objects, assets, playSound);
   return { system, racers, physics, cleanup: () => { system.dispose(racers); physics.dispose(); } };
 }
 
@@ -163,7 +163,8 @@ test("global pulse cuts opponents' power, local pulse affects nearby cars only",
 });
 
 test("bomb starts automatically, transfers its remaining fuse, then explodes", () => {
-  const f = fixture(); awardPowerup(f.racers[0].powerups, power("bomb"), false);
+  const sounds = [];
+  const f = fixture([], sound => sounds.push(sound)); awardPowerup(f.racers[0].powerups, power("bomb"), false);
   assert.equal(f.racers[0].powerups.held, null);
   f.racers[1].position.x = 6; f.system.update(0.01, f.racers);
   assert.equal(f.racers[0].powerups.bomb, 0);
@@ -171,6 +172,8 @@ test("bomb starts automatically, transfers its remaining fuse, then explodes", (
   f.racers[1].powerups.bomb = 0.01; f.system.update(0.02, f.racers);
   assert.equal(f.racers[1].powerups.bomb, 0);
   assert.ok(f.racers[1].car.body.linvel().y > 0);
+  assert.ok(sounds.includes("puttbang"));
+  assert.ok(!sounds.includes("firebang"));
   f.cleanup();
 });
 
@@ -197,11 +200,15 @@ test("ball bearing and water balloons are real dynamic bodies, resets remove the
 });
 
 test("rocket sweep hits mesh walls and shockwaves flip a car only once", () => {
-  const f = fixture();
+  const sounds = [];
+  const f = fixture([], sound => sounds.push(sound));
+  f.racers[1].position.set(0, 2, 80); f.racers[2].position.set(0, 2, 160);
   const wall = new THREE.Mesh(new THREE.BoxGeometry(100, 30, 1), new THREE.MeshBasicMaterial());
   wall.position.set(0, 10, 20); f.system.terrain.add(wall); f.system.terrain.updateMatrixWorld(true);
   awardPowerup(f.racers[0].powerups, power("firework"), false); f.system.fire(f.racers[0], f.racers);
   f.system.updateProjectiles(0.2, f.racers); assert.equal(f.system.projectiles.length, 0);
+  assert.ok(sounds.includes("firebang"));
+  assert.ok(!sounds.includes("puttbang"));
   f.system.terrain.remove(wall); f.racers[1].position.set(0, 2, 15);
   f.racers[0].powerups.cooldown = 0; awardPowerup(f.racers[0].powerups, power("shockwave"), false); f.system.fire(f.racers[0], f.racers);
   f.system.updateProjectiles(0.01, f.racers); const first = f.racers[1].car.body.linvel().y;
@@ -270,4 +277,56 @@ test("a burst balloon removes its body and temporarily reduces nearby grip", () 
   assert.equal(f.racers[1].powerups.slippery, 4);
   assert.equal(f.physics.world.bodies.len(), 3);
   f.cleanup();
+});
+
+for (const [label, near, far] of [
+  ["beside the shooter", [45, 2, 12], [0, 2, 100]],
+  ["behind the shooter", [0, 2, -60], [100, 2, 180]],
+  ["beyond the old homing range", [120, 2, 240], [0, 2, 450]],
+]) test(`fireworks find the closest opponent ${label}`, () => {
+  const f = fixture();
+  try {
+    f.racers[1].position.set(...near); f.racers[2].position.set(...far);
+    awardPowerup(f.racers[0].powerups, power("firework"), false);
+    f.system.fire(f.racers[0], f.racers);
+    const rocket = f.system.projectiles[0], speed = rocket.velocity.length();
+    f.system.updateProjectiles(1 / 120, f.racers);
+    assert.equal(rocket.target, f.racers[1]);
+    assert.ok(Math.abs(rocket.velocity.length() - speed) < 0.00001);
+  } finally { f.cleanup(); }
+});
+
+test("fireworks turn sharply enough to hit opponents beside and behind the car", () => {
+  for (const position of [[60, 2, 12], [0, 2, -50]]) {
+    const f = fixture();
+    try {
+      f.racers[1].position.set(...position); f.racers[2].finished = true;
+      awardPowerup(f.racers[0].powerups, power("fireworks"), false);
+      f.system.fire(f.racers[0], f.racers);
+      const rocket = f.system.projectiles[0];
+      for (let frame = 0; frame < 240 && f.system.projectiles.length; frame++) f.system.updateProjectiles(1 / 120, f.racers);
+      assert.ok(rocket.hitCars.has(f.racers[1]), `Missed opponent at ${position}`);
+      assert.ok(f.racers[1].car.body.linvel().y > 0);
+    } finally { f.cleanup(); }
+  }
+});
+
+test("fireworks lead a moving opponent and preserve inherited speed through turns", () => {
+  const f = fixture();
+  try {
+    f.racers[0].velocity.set(0, 0, 120);
+    f.racers[1].position.set(90, 2, 180); f.racers[1].velocity.set(120, 0, 0);
+    f.racers[2].finished = true;
+    awardPowerup(f.racers[0].powerups, power("firework"), false);
+    f.system.fire(f.racers[0], f.racers);
+    const rocket = f.system.projectiles[0], speed = rocket.velocity.length();
+    assert.ok(speed > 300);
+    for (let frame = 0; frame < 360 && f.system.projectiles.length; frame++) {
+      f.racers[1].position.addScaledVector(f.racers[1].velocity, 1 / 120);
+      f.system.updateProjectiles(1 / 120, f.racers);
+      assert.ok(Math.abs(rocket.velocity.length() - speed) < 0.00001);
+    }
+    assert.ok(rocket.hitCars.has(f.racers[1]), "Rocket must intercept the moving car");
+    assert.equal(rocket.target, f.racers[1], "Finished racers must not draw the rocket away");
+  } finally { f.cleanup(); }
 });

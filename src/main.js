@@ -454,7 +454,7 @@ class CarController {
 
 await initializePhysics();
 powerAssets = await PowerupSystem.loadAssets();
-for (const name of new Set([...POWERUPS.map((p) => p.sound), "pickup", "firebang", "wbombhit"])) {
+for (const name of new Set([...POWERUPS.map((p) => p.sound), "pickup", "firebang", "puttbang", "wbombhit"])) {
   const sound = new THREE.Audio(listener);
   powerSounds.set(name, sound);
   audioLoader.load(assetUrl(`/wavs/${name}.wav`), (buffer) => sound.setBuffer(buffer));
