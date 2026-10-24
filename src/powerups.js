@@ -80,7 +80,27 @@ export class PowerupSystem {
 
   dispose(racers) { this.reset(racers); this.scene.remove(this.group); }
 
+  setBombAppearance(racer, active) {
+    const fuse = racer.mesh.userData.bombFuse;
+    racer.mesh.traverse(object => {
+      if (!object.material || fuse?.getObjectById(object.id)) return;
+      if (active && !object.userData.bombOriginalMaterial) {
+        object.userData.bombOriginalMaterial = object.material;
+        const black = material => object.isLine
+          ? new THREE.LineBasicMaterial({ color: 0x000000 })
+          : object.isPoints ? new THREE.PointsMaterial({ color: 0x000000, size: material.size })
+          : new THREE.MeshBasicMaterial({ color: 0x000000, side: material.side });
+        object.material = Array.isArray(object.material) ? object.material.map(black) : black(object.material);
+      } else if (!active && object.userData.bombOriginalMaterial) {
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) material.dispose();
+        object.material = object.userData.bombOriginalMaterial;
+        delete object.userData.bombOriginalMaterial;
+      }
+    });
+  }
+
   restoreCar(racer) {
+    this.setBombAppearance(racer, false);
     disposeElectricPulse(racer.mesh);
     if (racer.mesh.userData.bombFuse) {
       racer.mesh.remove(racer.mesh.userData.bombFuse);
@@ -232,12 +252,12 @@ export class PowerupSystem {
           }
         }
       }
+      this.setBombAppearance(racer, state.bomb > 0);
       racer.mesh.traverse((object) => {
-        if (!object.material?.color) return;
+        if (state.bomb > 0 || !object.material?.color) return;
         object.userData.powerupColor ??= object.material.color.clone();
         object.material.color.copy(object.userData.powerupColor);
-        if (state.bomb > 0) object.material.color.multiplyScalar(0.2);
-        else if (state.disabled > 0 || state.electro > 0) object.material.color.set(0x65caff);
+        if (state.disabled > 0 || state.electro > 0) object.material.color.set(0x65caff);
       });
       this.updateElectricPulse(racer);
       if (state.electro > 0) for (const other of racers) {
