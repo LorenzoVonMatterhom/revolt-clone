@@ -42,6 +42,7 @@ export function meshTriangles(group) {
 // Chassis contacts all terrain; tires contact near-vertical obstacles, not ramps.
 // Native neighborhood ramps include banks around 60-70 degrees.
 const MIN_ROAD_NORMAL_Y = 0.15;
+const RECOVERY_RETRY_DELAY = 2;
 const CHASSIS_GROUPS = (1 << 16) | 3;
 const TERRAIN_GROUPS = (1 << 16) | 1;
 const TIRE_GROUPS = (2 << 16) | 3;
@@ -129,7 +130,7 @@ export class MeshPhysics {
         .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60);
       return this.world.createCollider(tire, body);
     });
-    const car = { body, vehicle, setup, autoRighting, collider, wheelColliders, shapeOffset, safePose: null, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
+    const car = { body, vehicle, setup, autoRighting, collider, wheelColliders, shapeOffset, safePose: null, recoveryCooldown: 0, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
     for (const shape of [collider, ...wheelColliders]) this.impactCars.set(shape.handle, car);
     return car;
   }
@@ -175,7 +176,7 @@ export class MeshPhysics {
         car.body.setLinvel({ x: 0, y: 0, z: 0 }, true); car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         this.world.propagateModifiedBodyPositionsToColliders();
         car.safePose = { position: position.clone(), rotation: new THREE.Quaternion().copy(rotation) };
-        car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0; car.impact=0; car.scrape=0;
+        car.recoveryCooldown = 0; car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0; car.impact=0; car.scrape=0;
         return true;
       }
     }
@@ -206,12 +207,23 @@ export class MeshPhysics {
     return false;
   }
 
+  recoverCar(car) {
+    if (!car.safePose || car.recoveryCooldown > 0) return false;
+    const placed = this.placeCar(car, car.safePose.position, car.safePose.rotation);
+    // Back off after failures too: an obstructed saved pose must not trigger
+    // placement searches on every physics tick. Manual Reset/Flip can still run.
+    car.recoveryCooldown = RECOVERY_RETRY_DELAY;
+    car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime = 0;
+    return placed;
+  }
+
   checkCar(car, dt, cars = []) {
+    car.recoveryCooldown = Math.max(0, car.recoveryCooldown - dt);
     const position = new THREE.Vector3().copy(car.body.translation());
     const rotation = new THREE.Quaternion().copy(car.body.rotation());
     const velocity = car.body.linvel();
     if (![...position.toArray(), ...rotation.toArray(), velocity.x, velocity.y, velocity.z].every(Number.isFinite)) {
-      if (car.safePose) this.placeCar(car, car.safePose.position, car.safePose.rotation);
+      this.recoverCar(car);
       return;
     }
     const roadContact = this.terrain ? car.collider.contactCollider(this.terrain, 0) : null;
@@ -222,7 +234,7 @@ export class MeshPhysics {
     const contact = contacts.find((hit) => hit.distance < -0.2) ?? contacts[0];
     const obstacleContact = contacts.some((hit) => Math.abs(hit.normal1.y) < MIN_ROAD_NORMAL_Y);
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).y;
-    const stationary = Math.hypot(velocity.x, velocity.z) < 2;
+    const stationary = Math.hypot(velocity.x, velocity.y, velocity.z) < 2;
     // Pressing an upright car into a wall is a normal collision, not a reset.
     car.blockedTime = stationary && upright < 0.25 ? car.blockedTime + dt : 0;
     const stacked=cars.some(other=>{
@@ -233,12 +245,14 @@ export class MeshPhysics {
     car.stackedTime=stacked?car.stackedTime+dt:0;
     const bodyCenter = car.setup.center.clone().applyQuaternion(rotation).add(position);
     const deeplyEmbedded = (contact && contact.distance < -0.2) || this.terrain?.projectPoint(bodyCenter, true).isInside;
-    car.embeddedTime = deeplyEmbedded ? car.embeddedTime + dt : 0;
+    // Raw mesh queries include ramp/back-face overlaps that the contact solver
+    // intentionally ignores. A moving or landing car is not immobilized.
+    car.embeddedTime = deeplyEmbedded && stationary ? car.embeddedTime + dt : 0;
     // An overturned player waits for the manual Flip control, even when touching
     // terrain or another car. AI recovery and upright penetration repair remain.
     const mayRecover = car.autoRighting || upright >= 0.25;
     if (mayRecover && (car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
-      this.placeCar(car, car.safePose.position, car.safePose.rotation);
+      this.recoverCar(car);
       return;
     }
     // Keep a previously clear resting pose, not the latest position pressed into a wall.

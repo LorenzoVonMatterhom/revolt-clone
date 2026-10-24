@@ -462,3 +462,39 @@ test("manual flip leaves the car alone when no ground exists below it", () => {
     assert.deepEqual(car.body.translation(),position);assert.deepEqual(car.body.rotation(),rotation);
   }finally{physics.dispose();}
 });
+
+test("failed automatic recovery backs off and does not block a manual reset", () => {
+  const ground=new THREE.Group();box(ground,[100,1,100],[0,-.5,0]);box(ground,[1,6,20],[5,3,0]);
+  const physics=new MeshPhysics(ground),car=physics.createCar(carMesh());
+  try {
+    assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()));
+    car.safePose.position.set(500,0,500); // No ground near this stale recovery pose.
+    car.body.setTranslation({x:5,y:.8,z:0},true);
+    physics.world.propagateModifiedBodyPositionsToColliders();
+    const place=physics.placeCar.bind(physics);let attempts=0;
+    physics.placeCar=(...args)=>{attempts++;return place(...args);};
+    for(let i=0;i<720;i++)physics.checkCar(car,1/120);
+    assert.ok(attempts>=2&&attempts<=3,`Failed placement retried ${attempts} times in six seconds`);
+    assert.equal(car.body.translation().x,5,'Failed recovery must not move the car to invalid ground');
+    assert.ok(car.recoveryCooldown>0);
+    assert.ok(physics.placeCar(car,new THREE.Vector3(-10,0,0),new THREE.Quaternion()),'Manual placement must remain available during the retry delay');
+    assert.ok(Math.abs(car.body.translation().x+10)<.01);
+  }finally{physics.dispose();}
+});
+
+test("successful penetration recovery cannot teleport the car repeatedly in the next second", () => {
+  const ground=new THREE.Group();box(ground,[100,1,100],[0,-.5,0]);box(ground,[1,6,20],[5,3,0]);
+  const physics=new MeshPhysics(ground),car=physics.createCar(carMesh());
+  try {
+    assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()));
+    const place=physics.placeCar.bind(physics);let recoveries=0;
+    physics.placeCar=(...args)=>{recoveries++;return place(...args);};
+    const embed=()=>{car.body.setTranslation({x:5,y:.8,z:0},true);car.body.setLinvel({x:0,y:0,z:0},true);physics.world.propagateModifiedBodyPositionsToColliders();};
+    embed();for(let i=0;i<60;i++)physics.checkCar(car,1/120);
+    assert.equal(recoveries,1);assert.ok(car.body.translation().x<2);
+    embed();for(let i=0;i<60;i++)physics.checkCar(car,1/120);
+    assert.equal(recoveries,1,'A second obstruction must not create another immediate respawn');
+    for(let i=0;i<60;i++){physics.updateVehicle(car,1/120,-1,0,0,false);physics.step();physics.checkCar(car,1/120);}
+    assert.ok(car.body.translation().z< -2,'Retry delay must leave reverse driving active');
+  }finally{physics.dispose();}
+});
