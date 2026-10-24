@@ -48,3 +48,19 @@ test("skids use bounded geometry, fade and clear on race reset", () => {
   marks.clear(); assert.equal(marks.count,0); assert.equal(marks.geometry.drawRange.count,0);
   marks.dispose();
 });
+
+test("only oil-coated grounded wheels leave dark tracks during low friction even driving straight", () => {
+  const marks=new SkidMarks(new THREE.Scene()); let z=0, contact=true;
+  const racer={sliding:false,powerups:{slippery:4,oilWheels:[4,0]},car:{setup:{wheels:[{radius:1},{radius:1}]},vehicle:{
+    numWheels:()=>2,wheelIsInContact:()=>contact,
+    wheelContactPoint:i=>({x:i*4,y:0,z}),wheelContactNormal:()=>({x:0,y:1,z:0}),
+  }}};
+  try {
+    marks.track(racer);z=1;marks.track(racer);assert.equal(marks.count,1);
+    assert.ok(marks.colors[3]>.85);
+    contact=false;z=2;marks.track(racer);contact=true;z=3;marks.track(racer);assert.equal(marks.count,1);
+    z=4;marks.track(racer);assert.equal(marks.count,2);
+    racer.powerups.slippery=0;z=5;marks.track(racer);assert.equal(marks.count,2);
+    marks.update(40);assert.equal(marks.colors[3],0);
+  } finally {marks.dispose();}
+});

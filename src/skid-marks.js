@@ -8,6 +8,7 @@ export class SkidMarks {
   constructor(scene, capacity = 2048) {
     this.scene = scene; this.capacity = capacity; this.count = 0; this.next = 0;
     this.previous = new Map(); this.ages = new Float32Array(capacity).fill(40);
+    this.opacity = new Float32Array(capacity).fill(0.6);
     this.positions = new Float32Array(capacity * 18);
     this.colors = new Float32Array(capacity * 24);
     this.geometry = new THREE.BufferGeometry();
@@ -20,7 +21,7 @@ export class SkidMarks {
     scene.add(this.mesh);
   }
 
-  segment(from, to, normal, width) {
+  segment(from, to, normal, width, opacity = 0.6) {
     const direction = to.clone().sub(from);
     const distance = direction.length();
     if (distance < 0.15 || distance > 8) return false;
@@ -30,8 +31,9 @@ export class SkidMarks {
     const slot = this.next; this.next = (slot + 1) % this.capacity;
     [0,1,2,0,2,3].forEach((corner, i) => {
       corners[corner].toArray(this.positions, slot * 18 + i * 3);
-      this.colors.set([1,1,1,0.6], slot * 24 + i * 4);
+      this.colors.set([1,1,1,opacity], slot * 24 + i * 4);
     });
+    this.opacity[slot] = opacity;
     this.ages[slot] = 0; this.count = Math.min(this.capacity, this.count + 1);
     this.geometry.setDrawRange(0, this.count * 6);
     this.geometry.attributes.position.needsUpdate = true; this.geometry.attributes.color.needsUpdate = true;
@@ -39,17 +41,20 @@ export class SkidMarks {
   }
 
   track(racer) {
-    if (!racer.sliding || racer.finished) { this.previous.delete(racer); return; }
+    const oily = racer.powerups?.slippery > 0 && racer.powerups.oilWheels?.some(time => time > 0);
+    if ((!racer.sliding && !oily) || racer.finished) { this.previous.delete(racer); return; }
     const previous = this.previous.get(racer) ?? [];
     const vehicle = racer.car.vehicle;
     for (let i = 0; i < vehicle.numWheels(); i++) {
+      const oiledWheel = oily && racer.powerups.oilWheels[i] > 0;
+      if (!racer.sliding && !oiledWheel) { previous[i] = null; continue; }
       const contact = vehicle.wheelIsInContact(i) && vehicle.wheelContactPoint(i);
       const contactNormal = vehicle.wheelContactNormal(i);
       if (!contact || !contactNormal || contactNormal.y < 0.15) { previous[i] = null; continue; }
       const point = new THREE.Vector3().copy(contact), normal = new THREE.Vector3().copy(contactNormal).normalize();
       if (!previous[i]) previous[i] = point;
       else if (point.distanceTo(previous[i]) > 8) previous[i] = point;
-      else if (this.segment(previous[i], point, normal, Math.max(0.25, racer.car.setup.wheels[i].radius * 0.45))) previous[i] = point;
+      else if (this.segment(previous[i], point, normal, Math.max(0.25, racer.car.setup.wheels[i].radius * 0.45), oiledWheel ? 0.9 : 0.6)) previous[i] = point;
     }
     this.previous.set(racer, previous);
   }
@@ -57,7 +62,7 @@ export class SkidMarks {
   update(dt) {
     for (let slot = 0; slot < this.count; slot++) {
       this.ages[slot] += dt;
-      const alpha = 0.6 * THREE.MathUtils.clamp((40 - this.ages[slot]) / 20, 0, 1);
+      const alpha = this.opacity[slot] * THREE.MathUtils.clamp((40 - this.ages[slot]) / 20, 0, 1);
       for (let i = 0; i < 6; i++) this.colors[slot * 24 + i * 4 + 3] = alpha;
     }
     this.geometry.attributes.color.needsUpdate = true;
