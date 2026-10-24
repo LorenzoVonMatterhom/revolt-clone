@@ -498,3 +498,21 @@ test("successful penetration recovery cannot teleport the car repeatedly in the 
     assert.ok(car.body.translation().z< -2,'Retry delay must leave reverse driving active');
   }finally{physics.dispose();}
 });
+
+for (const id of ["rc", "cougar", "sugo"]) test(`${id} turns strongly while accelerating at speed`, async () => {
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = async url => new Response(readFileSync(String(url).slice(1)));
+  let physics, mesh;
+  try {
+    const ground = new THREE.Group(); box(ground, [2000, 1, 2000], [0, -0.5, 0]);
+    physics = new MeshPhysics(ground); mesh = await loadCar(id, id);
+    const car = physics.createCar(mesh);
+    physics.placeCar(car, new THREE.Vector3(), new THREE.Quaternion());
+    for (let frame = 0; frame < 120; frame++) { physics.updateVehicle(car, 1/120, 0, 0, 0, false, 1, 2.1); physics.step(); }
+    car.body.setLinvel({ x: 0, y: 0, z: 90 }, true);
+    for (let frame = 0; frame < 72; frame++) { physics.updateVehicle(car, 1/120, 1, 0, 1, false, 1, 2.1); physics.step(); }
+    const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(car.body.rotation());
+    assert.ok(Math.atan2(direction.x, direction.z) > 0.65, `${id}: insufficient full-throttle turn ${Math.atan2(direction.x, direction.z)}, up ${new THREE.Vector3(0,1,0).applyQuaternion(car.body.rotation()).y}, position ${JSON.stringify(car.body.translation())}`);
+    assert.ok(car.body.translation().x > 10, `${id}: car must actually follow the turn`);
+  } finally { globalThis.fetch = savedFetch; physics?.dispose(); mesh?.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }
+});
