@@ -276,6 +276,7 @@ export class MeshPhysics {
     // Keep low-speed lock; ease player steering down by at most ten percent.
     const speedSteering = steeringGain > 1 ? 1 - 0.1 * THREE.MathUtils.smoothstep(Math.abs(speed), 30, 180) : 1;
     const totalDriveRatio=car.setup.wheels.reduce((sum,wheel)=>sum+((wheel.powered??true)?(wheel.engineRatio??1):0),0);
+    const rearDrive = car.setup.wheels.some(w => w.powered) && !car.setup.wheels.some(w => w.powered && w.position.z > 0);
     for (let i = 0; i < car.vehicle.numWheels(); i++) {
       const front = car.setup.wheels[i].position.z > 0;
       const wheel = car.setup.wheels[i];
@@ -293,6 +294,22 @@ export class MeshPhysics {
     // visible steering lock. Support the player's grounded turn at the chassis.
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(car.body.rotation()).y;
     const contacts = car.setup.wheels.filter((_, i) => car.vehicle.wheelIsInContact(i)).length;
+    // Rear-driven launches can pivot the light chassis onto its rear axle.
+    // Resist drive-induced nose lift only while tires still support the car.
+    if (rearDrive && throttle > 0 && upright > 0.7 && contacts >= 2) {
+      const groundUp = new THREE.Vector3();
+      car.setup.wheels.forEach((_, i) => { if (car.vehicle.wheelIsInContact(i)) groundUp.add(car.vehicle.wheelContactNormal(i)); });
+      groundUp.normalize();
+      const noseLift = forward.dot(groundUp);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(car.body.rotation());
+      const spin = new THREE.Vector3().copy(car.body.angvel());
+      const pitchRate = spin.dot(right);
+      const target = Math.asin(THREE.MathUtils.clamp(noseLift, -1, 1)) * 10;
+      if (noseLift > 0.05 && pitchRate < target) {
+        spin.addScaledVector(right, (target - pitchRate) * (1 - Math.exp(-40 * dt)));
+        car.body.setAngvel(spin, true);
+      }
+    }
     if (steeringGain > 1 && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
       const wheels = car.setup.wheels;
       const wheelbase = Math.max(4, Math.max(...wheels.map(w => w.position.z)) - Math.min(...wheels.map(w => w.position.z)));
