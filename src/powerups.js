@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createShockwaveVisual, updateShockwaveVisual, disposeShockwaveVisual } from "./shockwave-visual.js";
 import { updateBatteryGlow, disposeBatteryGlow } from "./battery-glow.js";
 import { createElectricPulse, disposeElectricPulse } from "./electric-pulse.js";
 import { gameAssetUrl } from "./assets.js";
@@ -75,7 +76,8 @@ export class PowerupSystem {
   remove(entity) {
     this.group.remove(entity.mesh);
     if (entity.body) this.physics.world.removeRigidBody(entity.body);
-    if (entity.unique) { entity.mesh.geometry?.dispose(); entity.mesh.material?.dispose(); }
+    if (entity.kind === "shockwave") disposeShockwaveVisual(entity.mesh);
+    else if (entity.unique) { entity.mesh.geometry?.dispose(); entity.mesh.material?.dispose(); }
     if (entity.texture) { entity.mesh.material.dispose(); entity.texture.dispose(); }
   }
 
@@ -153,7 +155,7 @@ export class PowerupSystem {
 
   spawnProjectile(racer, kind) {
     const forward = this.forward(racer);
-    const mesh = kind === "shockwave" ? new THREE.Mesh(new THREE.SphereGeometry(2, 12, 8), new THREE.MeshBasicMaterial({ color: 0x54cfff, wireframe: true })) : this.assets.models[kind === "balloons" ? "wbomb" : "firework"].clone(true);
+    const mesh = kind === "shockwave" ? createShockwaveVisual() : this.assets.models[kind === "balloons" ? "wbomb" : "firework"].clone(true);
     if (kind === "balloons") mesh.scale.setScalar(0.4);
     mesh.position.copy(racer.position).addScaledVector(forward, 12); mesh.position.y += 3;
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward);
@@ -344,6 +346,7 @@ export class PowerupSystem {
   updateProjectiles(dt, racers) {
     for (const projectile of this.projectiles) {
       projectile.life -= dt;
+      if (projectile.kind === "shockwave") updateShockwaveVisual(projectile.mesh, dt, projectile.velocity.length());
       const previous = projectile.mesh.position.clone();
       if (projectile.body) {
         projectile.mesh.position.copy(projectile.body.translation());

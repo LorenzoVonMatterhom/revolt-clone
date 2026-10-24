@@ -411,3 +411,23 @@ test("battery adds a reusable orange surface shader and restores the car on expi
     assert.equal(racer.mesh.material.color.getHex(), 0);
   } finally { f.cleanup(); }
 });
+
+test("shockwave has a glowing blue-white core and a growing bead trail with resource cleanup", () => {
+  const f = fixture();
+  try {
+    awardPowerup(f.racers[0].powerups, power("shockwave"), false); f.system.fire(f.racers[0], f.racers);
+    const mesh = f.system.projectiles[0].mesh;
+    assert.equal(mesh.children.length, 15);
+    assert.equal(mesh.children[2].material.color.getHex(), 0xffffff);
+    assert.equal(mesh.children[0].material.blending, THREE.AdditiveBlending);
+    assert.ok(mesh.userData.beads.every(bead => !bead.visible));
+    f.system.updateProjectiles(.1, [f.racers[0]]);
+    assert.ok(mesh.userData.beads[0].visible);
+    assert.ok(!mesh.userData.beads[11].visible);
+    let textures = 0, materials = 0;
+    mesh.userData.shockwaveTexture.addEventListener("dispose", () => textures++);
+    mesh.children.forEach(part => part.material.addEventListener("dispose", () => materials++));
+    f.system.reset(f.racers);
+    assert.equal(textures, 1); assert.equal(materials, 15);
+  } finally { f.cleanup(); }
+});
