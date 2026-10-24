@@ -431,3 +431,26 @@ test("shockwave has a glowing blue-white core and a growing bead trail with reso
     assert.equal(textures, 1); assert.equal(materials, 15);
   } finally { f.cleanup(); }
 });
+
+test("electric lightning follows body surfaces, preserves paint, and affects shocked opponents", () => {
+  const f = fixture(), racer = f.racers[0], target = f.racers[1];
+  const original = racer.mesh.material;
+  racer.mesh.material.color.set(0xdd2233);
+  target.position.set(20,2,0);
+  try {
+    awardPowerup(racer.powerups, power("electro"), false); f.system.fire(racer,f.racers); f.system.update(.1,f.racers);
+    const effect = racer.mesh.userData.electricPulse;
+    assert.ok(effect.isGroup);
+    assert.equal(effect.userData.overlays[0].geometry,racer.mesh.geometry);
+    assert.equal(effect.userData.overlays[0].parent,racer.mesh);
+    assert.equal(racer.mesh.material,original);
+    assert.equal(original.color.getHex(),0xdd2233);
+    assert.ok(target.powerups.disabled>0);
+    f.system.update(.1,f.racers);
+    assert.ok(target.mesh.userData.electricPulse);
+    const overlay=effect.userData.overlays[0];
+    f.system.reset(f.racers);
+    assert.equal(overlay.parent,null);
+    assert.equal(racer.mesh.material,original);
+  } finally { f.cleanup(); }
+});

@@ -2316,59 +2316,64 @@ export class MeshPhysics {
 import * as THREE from "three";
 
 export function createElectricPulse(car) {
-  const size = car.userData.physics?.halfExtents ?? new THREE.Vector3(2, 1, 4);
-  const center = car.userData.physics?.center ?? new THREE.Vector3();
+  const parts = [];
+  const fuse = car.userData.bombFuse;
+  car.traverse(part => {
+    if (part.isMesh && !part.userData.batteryGlowFX && !part.userData.electricPulseFX && !fuse?.getObjectById(part.id)) parts.push(part);
+  });
   const material = new THREE.ShaderMaterial({
     uniforms: { time: { value: 0 }, strength: { value: 1 } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
     vertexShader: `
-      varying vec2 pulseUv;
-      varying vec3 pulseNormal;
-      varying vec3 pulseView;
+      varying vec3 arcPosition;
       void main() {
-        pulseUv = uv;
-        vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-        pulseNormal = normalize(normalMatrix * normal);
-        pulseView = normalize(-viewPosition.xyz);
-        gl_Position = projectionMatrix * viewPosition;
+        arcPosition = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * 0.04, 1.0);
       }
     `,
     fragmentShader: `
       uniform float time;
       uniform float strength;
-      varying vec2 pulseUv;
-      varying vec3 pulseNormal;
-      varying vec3 pulseView;
+      varying vec3 arcPosition;
       void main() {
-        float edge = pow(1.0 - abs(dot(normalize(pulseNormal), normalize(pulseView))), 2.0);
-        float zigzag = sin(pulseUv.y * 64.0 + time * 19.0) * 0.7
-          + sin(pulseUv.y * 137.0 - time * 27.0) * 0.35;
-        float arc = pow(max(0.0, cos(pulseUv.x * 50.2655 + zigzag + time * 3.0)), 45.0);
-        float flicker = 0.65 + 0.35 * sin(time * 37.0 + pulseUv.y * 23.0);
-        float alpha = strength * (edge * 0.14 + arc * flicker * 0.85);
-        vec3 color = mix(vec3(0.08, 0.4, 1.0), vec3(0.65, 0.95, 1.0), arc);
-        gl_FragColor = vec4(color, alpha);
+        float tick = floor(time * 14.0);
+        vec3 p = arcPosition * 0.65;
+        float jag = sin(p.z * 6.0 + tick * 3.7) * 0.33
+          + sin(p.z * 17.0 - tick * 2.3) * 0.14;
+        float mainArc = abs(sin(p.x * 2.2 + p.y * 1.5 + jag + tick * 0.6));
+        float branch = abs(sin(p.z * 2.0 - p.y * 2.7 + sin(p.x * 13.0 + tick) * 0.3));
+        float core = 1.0 - smoothstep(0.015, 0.065, mainArc);
+        float fork = (1.0 - smoothstep(0.01, 0.045, branch))
+          * (1.0 - smoothstep(0.15, 0.55, mainArc));
+        float glow = (1.0 - smoothstep(0.03, 0.24, mainArc)) * 0.22;
+        float arc = max(core, fork);
+        vec3 color = mix(vec3(0.32, 0.24, 1.0), vec3(0.88, 0.91, 1.0), arc);
+        gl_FragColor = vec4(color, strength * min(1.0, arc + glow));
       }
     `,
   });
-  const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), material);
-  shell.name = "Animated electro pulse";
-  shell.userData.electricPulseFX = true;
-  shell.position.copy(center);
-  shell.scale.set(size.x * 1.35 + 0.5, size.y * 1.5 + 0.8, size.z * 1.25 + 0.5);
-  car.add(shell);
-  return shell;
+  const effect = new THREE.Group();
+  effect.name = "White-violet surface lightning";
+  effect.userData.electricPulseFX = true;
+  effect.material = material;
+  effect.userData.overlays = parts.map(part => {
+    const overlay = new THREE.Mesh(part.geometry, material);
+    overlay.name = "Surface lightning arcs";
+    overlay.userData.electricPulseFX = true;
+    part.add(overlay); return overlay;
+  });
+  car.add(effect);
+  return effect;
 }
 
 export function disposeElectricPulse(car) {
-  const shell = car.userData.electricPulse;
-  if (!shell) return;
-  car.remove(shell);
-  shell.geometry.dispose(); shell.material.dispose();
+  const effect = car.userData.electricPulse;
+  if (!effect) return;
+  for (const overlay of effect.userData.overlays) overlay.removeFromParent();
+  effect.removeFromParent(); effect.material.dispose();
   delete car.userData.electricPulse;
 }
-
 </script>
 <script type="text/plain" data-game-module="powerups.js">
 import * as THREE from "three";
@@ -2459,7 +2464,7 @@ export class PowerupSystem {
   setBombAppearance(racer, active) {
     const fuse = racer.mesh.userData.bombFuse;
     racer.mesh.traverse(object => {
-      if (!object.material || object.userData.batteryGlowFX || fuse?.getObjectById(object.id)) return;
+      if (!object.material || object.userData.batteryGlowFX || object.userData.electricPulseFX || fuse?.getObjectById(object.id)) return;
       if (active && !object.userData.bombOriginalMaterial) {
         object.userData.bombOriginalMaterial = object.material;
         const black = material => object.isLine
@@ -2487,10 +2492,10 @@ export class PowerupSystem {
   }
 
   updateElectricPulse(racer) {
-    if (racer.powerups.electro <= 0) { disposeElectricPulse(racer.mesh); return; }
+    if ((racer.powerups.electro <= 0 && racer.powerups.disabled <= 0) || racer.powerups.bomb > 0) { disposeElectricPulse(racer.mesh); return; }
     const shell = racer.mesh.userData.electricPulse ??= createElectricPulse(racer.mesh);
     shell.material.uniforms.time.value = this.time;
-    shell.material.uniforms.strength.value = Math.min(1, racer.powerups.electro * 4);
+    shell.material.uniforms.strength.value = Math.min(1, Math.max(racer.powerups.electro, racer.powerups.disabled) * 4);
   }
 
   forward(racer) { return new THREE.Vector3(0, 0, 1).applyQuaternion(racer.mesh.quaternion).normalize(); }
@@ -2509,7 +2514,7 @@ export class PowerupSystem {
       if (i > 0 && i < 8) point.add(new THREE.Vector3(Math.sin(i * 7 + this.time * 20) * 1.4, Math.cos(i * 9) * 1.4, 0));
       return point;
     });
-    const mesh = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0x75ddff, transparent: true, blending: THREE.AdditiveBlending }));
+    const mesh = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0xd9ccff, transparent: true, blending: THREE.AdditiveBlending }));
     this.group.add(mesh); this.effects.push({ mesh, life: 0.16, bolt: true, unique: true });
   }
 
@@ -2635,7 +2640,7 @@ export class PowerupSystem {
         if (state.bomb > 0 || !object.material?.color) return;
         object.userData.powerupColor ??= object.material.color.clone();
         object.material.color.copy(object.userData.powerupColor);
-        if (state.disabled > 0 || state.electro > 0) object.material.color.set(0x65caff);
+
       });
       this.updateElectricPulse(racer);
       if (state.electro > 0) for (const other of racers) {

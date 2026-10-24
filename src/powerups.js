@@ -86,7 +86,7 @@ export class PowerupSystem {
   setBombAppearance(racer, active) {
     const fuse = racer.mesh.userData.bombFuse;
     racer.mesh.traverse(object => {
-      if (!object.material || object.userData.batteryGlowFX || fuse?.getObjectById(object.id)) return;
+      if (!object.material || object.userData.batteryGlowFX || object.userData.electricPulseFX || fuse?.getObjectById(object.id)) return;
       if (active && !object.userData.bombOriginalMaterial) {
         object.userData.bombOriginalMaterial = object.material;
         const black = material => object.isLine
@@ -114,10 +114,10 @@ export class PowerupSystem {
   }
 
   updateElectricPulse(racer) {
-    if (racer.powerups.electro <= 0) { disposeElectricPulse(racer.mesh); return; }
+    if ((racer.powerups.electro <= 0 && racer.powerups.disabled <= 0) || racer.powerups.bomb > 0) { disposeElectricPulse(racer.mesh); return; }
     const shell = racer.mesh.userData.electricPulse ??= createElectricPulse(racer.mesh);
     shell.material.uniforms.time.value = this.time;
-    shell.material.uniforms.strength.value = Math.min(1, racer.powerups.electro * 4);
+    shell.material.uniforms.strength.value = Math.min(1, Math.max(racer.powerups.electro, racer.powerups.disabled) * 4);
   }
 
   forward(racer) { return new THREE.Vector3(0, 0, 1).applyQuaternion(racer.mesh.quaternion).normalize(); }
@@ -136,7 +136,7 @@ export class PowerupSystem {
       if (i > 0 && i < 8) point.add(new THREE.Vector3(Math.sin(i * 7 + this.time * 20) * 1.4, Math.cos(i * 9) * 1.4, 0));
       return point;
     });
-    const mesh = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0x75ddff, transparent: true, blending: THREE.AdditiveBlending }));
+    const mesh = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0xd9ccff, transparent: true, blending: THREE.AdditiveBlending }));
     this.group.add(mesh); this.effects.push({ mesh, life: 0.16, bolt: true, unique: true });
   }
 
@@ -262,7 +262,7 @@ export class PowerupSystem {
         if (state.bomb > 0 || !object.material?.color) return;
         object.userData.powerupColor ??= object.material.color.clone();
         object.material.color.copy(object.userData.powerupColor);
-        if (state.disabled > 0 || state.electro > 0) object.material.color.set(0x65caff);
+
       });
       this.updateElectricPulse(racer);
       if (state.electro > 0) for (const other of racers) {
