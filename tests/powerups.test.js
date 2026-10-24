@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { LEVELS } from "../src/levels.js";
-import { parseObjects, parseInfo } from "../src/revolt.js";
+import { parseObjects, parseInfo, loadCar } from "../src/revolt.js";
 import { initializePhysics, MeshPhysics } from "../src/physics.js";
 import { PowerupSystem, POWERUPS, createPowerState, choosePowerup, awardPowerup } from "../src/powerups.js";
 
@@ -329,4 +329,32 @@ test("fireworks lead a moving opponent and preserve inherited speed through turn
     assert.ok(rocket.hitCars.has(f.racers[1]), "Rocket must intercept the moving car");
     assert.equal(rocket.target, f.racers[1], "Finished racers must not draw the rocket away");
   } finally { f.cleanup(); }
+});
+
+for (const id of ["rc", "cougar", "sugo", "phat"]) test(`shockwave overturns the original ${id} chassis`, async () => {
+  const f = fixture();
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = async url => new Response(readFileSync(url.slice(1)));
+  let mesh;
+  try {
+    mesh = await loadCar(id, id);
+    const car = f.physics.createCar(mesh, { autoRighting: false });
+    car.body.setTranslation({ x: 0, y: 2, z: 15 }, true);
+    const target = { mesh, position: new THREE.Vector3(0, 2, 15), velocity: new THREE.Vector3(), car, powerups: createPowerState() };
+    awardPowerup(f.racers[0].powerups, power("shockwave"), false);
+    f.system.fire(f.racers[0], [f.racers[0], target]);
+    f.system.updateProjectiles(1 / 120, [f.racers[0], target]);
+    assert.ok(car.body.linvel().y >= 23.9);
+    let inverted = false;
+    for (let frame = 0; frame < 72; frame++) {
+      f.physics.updateVehicle(car, 1 / 120, 0, 0, 0, false);
+      f.physics.step();
+      if (new THREE.Vector3(0, 1, 0).applyQuaternion(car.body.rotation()).y < -0.5) inverted = true;
+    }
+    assert.ok(inverted, `${id} should roll past upside down after a hit`);
+  } finally {
+    globalThis.fetch = savedFetch;
+    f.cleanup();
+    mesh?.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); });
+  }
 });
