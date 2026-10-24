@@ -2100,6 +2100,21 @@ export class MeshPhysics {
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
     car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, TERRAIN_GROUPS, collider => collider.handle === this.terrain?.handle);
+    // At full throttle the tire solver saturates lateral grip, despite full
+    // visible steering lock. Support the player's grounded turn at the chassis.
+    const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(car.body.rotation()).y;
+    const contacts = car.setup.wheels.filter((_, i) => car.vehicle.wheelIsInContact(i)).length;
+    if (steeringGain > 1 && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
+      const wheels = car.setup.wheels;
+      const wheelbase = Math.max(4, Math.max(...wheels.map(w => w.position.z)) - Math.min(...wheels.map(w => w.position.z)));
+      const yawTarget = THREE.MathUtils.clamp(speed / wheelbase * Math.tan(steering * 0.65), -2.8, 2.8);
+      const spin = car.body.angvel();
+      car.body.setAngvel({ x: spin.x, y: THREE.MathUtils.lerp(spin.y, yawTarget, 1 - Math.exp(-40 * dt)), z: spin.z }, true);
+      const side = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
+      const velocity = new THREE.Vector3().copy(car.body.linvel());
+      const correction = -velocity.dot(side) * (1 - Math.exp(-16 * dt)) * car.body.mass();
+      car.body.applyImpulse(side.multiplyScalar(correction), true);
+    }
     car.wheelColliders.forEach((tire, i) => {
       const wheel = car.setup.wheels[i];
       const suspension = car.vehicle.wheelSuspensionLength(i) ?? 0.6;
