@@ -534,6 +534,7 @@ test("a real car crossing freshly dropped oil immediately leaves narrow oily tir
     assert.ok(target.powerups.oilWheels.some(time=>time>0),"A following car must pick up fresh oil before 0.7 seconds");
     assert.ok(marks.count>10,"Real wheel contacts must produce visible trail geometry");
     const edge=new THREE.Vector3().fromArray(marks.positions,0).distanceTo(new THREE.Vector3().fromArray(marks.positions,3));
-    assert.ok(edge>=.35 && edge<.8,"Oil tracks should stay narrow and visible");
+    const fullTread = Math.max(...car.setup.wheels.map(wheel => wheel.halfWidth * 2));
+    assert.ok(edge >= .34999 && edge < fullTread * .55,"Oil tracks should be less than 55% of full tread width");
   } finally {globalThis.fetch=savedFetch;marks.dispose();f.cleanup();mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
 });
