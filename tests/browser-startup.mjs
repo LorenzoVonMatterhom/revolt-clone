@@ -4,6 +4,41 @@ import { chromium, webkit } from "playwright";
 function installFlipHarness() {
   // Keep software-rendered WebKit responsive for UI interactions.
   renderer.setPixelRatio(0.5); renderer.shadowMap.enabled = false;
+  window.__lapTest = {
+    drive(from, to) {
+      const route = makeRaceRoute(loadedLevel.aiRoute);
+      const normal = checkpoints[0].normal;
+      let phase = 0, closest = Infinity;
+      for (let i = 1; i <= 4000; i++) {
+        const a = route.getPointAt((i - 1) / 4000), b = route.getPointAt(i / 4000);
+        const before = a.dot(normal), after = b.dot(normal);
+        if (before >= 0 || after < 0) continue;
+        const fraction = before / (before - after), at = a.clone().lerp(b, fraction);
+        if (Math.hypot(at.x, at.z) < closest && Math.abs(at.y) < 80) {
+          closest = Math.hypot(at.x, at.z); phase = (i - 1 + fraction) / 4000;
+        }
+      }
+      // Sample real driving positions through the production player/HUD logic.
+      for (let i = 0; i <= 4000; i++) {
+        const t = (phase + 0.0001 + from + (to - from) * i / 4000) % 1;
+        player.position.copy(route.getPointAt(t)).add(new THREE.Vector3(0, 2, 0));
+        player.velocity.copy(route.getTangentAt(t)); // Slow finish crossings count too.
+        player.updateProgress(nearestTrackData(player.position));
+      }
+      player.car.body.setTranslation(player.position, true);
+      player.car.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      updateHud();
+      return this.state();
+    },
+    completeReset() {
+      resetFade?.update(1); resetFade?.update(1);
+      updateHud();
+      return this.state();
+    },
+    state() {
+      return { lap: player.lap, checkpoint: player.nextCheckpoint, finished: player.finished, hud: lapEl.textContent };
+    },
+  };
   window.__flipTest = {
     overturn(moveAside = true) {
       const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), player.heading);
@@ -58,6 +93,25 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     console.log(name, "mobile showroom loaded");
     await page.locator("#carSelect").selectOption({ label: "Cougar" });
     await page.waitForFunction(() => document.querySelector("#scene")?.dataset.selectedCar === "cougar");
+    for (const track of ["nhood1", "nhood2"]) {
+      await page.locator("#menuTrack").selectOption(track);
+      await page.waitForFunction(id => window.revoltMap?.id === id && !document.querySelector("#startBtn").disabled, track, { timeout: 60000 });
+      await page.locator("#startBtn").tap();
+      await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race");
+      const secondLap = await page.evaluate(() => window.__lapTest.drive(0, 1));
+      if (secondLap.hud !== "2/3") throw new Error(`${track}: first lap did not update HUD: ${JSON.stringify(secondLap)}`);
+      const beforeReset = await page.evaluate(() => window.__lapTest.drive(0, 0.55));
+      await page.locator("#resetBtn").tap();
+      const afterReset = await page.evaluate(() => window.__lapTest.completeReset());
+      if (afterReset.lap !== beforeReset.lap || afterReset.checkpoint !== beforeReset.checkpoint)
+        throw new Error(`${track}: Reset erased lap/checkpoint progress`);
+      const thirdLap = await page.evaluate(() => window.__lapTest.drive(0.55, 1));
+      if (thirdLap.hud !== "3/3") throw new Error(`${track}: second lap did not update HUD: ${JSON.stringify(thirdLap)}`);
+      const finish = await page.evaluate(() => window.__lapTest.drive(0, 1));
+      if (!finish.finished || finish.hud !== "3/3") throw new Error(`${track}: third lap did not finish: ${JSON.stringify(finish)}`);
+      console.log(name, track, "HUD advances 1/3 → 2/3 → 3/3 and finishes; Reset preserves checkpoints");
+      await page.locator("#menuBtn").tap();
+    }
     await page.locator("#menuTrack").selectOption("ship1");
     await page.waitForFunction(() => window.revoltMap?.id === "ship1" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
     await page.locator("#startBtn").tap();
