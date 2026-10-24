@@ -2524,7 +2524,15 @@ export class PowerupSystem {
         const closest = segment.closestPointToPoint(racer.position, true, new THREE.Vector3());
         if (closest.distanceTo(racer.position) > (projectile.kind === "shockwave" ? 12 : 8)) continue;
         projectile.hitCars.add(racer);
-        if (projectile.kind === "shockwave") { racer.car.body.applyImpulse({ x: 0, y: 160, z: 0 }, true); racer.car.body.applyTorqueImpulse({ x: 60, y: 10, z: 40 }, true); }
+        if (projectile.kind === "shockwave") {
+          const body = racer.car.body;
+          // Give every chassis the same launch and roll, regardless of mass or inertia.
+          const velocity = body.linvel();
+          body.applyImpulse({ x: 0, y: body.mass() * Math.max(0, 24 - velocity.y), z: 0 }, true);
+          const roll = new THREE.Vector3(0, 0, 14).applyQuaternion(body.rotation());
+          const spin = body.angvel();
+          body.setAngvel({ x: spin.x + roll.x, y: spin.y + roll.y, z: spin.z + roll.z }, true);
+        }
         else projectile.life = 0;
       }
       if (projectile.life <= 0 && projectile.kind === "balloons") {
