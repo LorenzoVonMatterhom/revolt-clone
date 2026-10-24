@@ -69,60 +69,41 @@ function installDrivingHarness() {
   };
 }
 
+async function openGamePage(browser, name) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const shaderErrors = [];
+  page.on("console", message => { if (/shader error|VALIDATE_STATUS|ERROR: 0:/i.test(message.text())) shaderErrors.push(message.text()); });
+  page.on("pageerror", error => console.log(name, "PAGE ERROR:", error.message));
+  page.on("console", message => { if (message.type() === "error") console.log(name, "CONSOLE ERROR:", message.text()); });
+  page.on("requestfailed", request => console.log(name, "REQUEST FAILED:", request.url(), request.failure()?.errorText));
+  const gameUrl = process.env.GAME_TEST_URL ?? "http://127.0.0.1:8000/";
+  await page.route(gameUrl, async route => {
+    const response = await route.fetch();
+    const body = await response.text();
+    const instrumented = body.replace(/(<script[^>]*data-game-module="main\.js"[^>]*>)([\s\S]*?)(<\/script>)/,
+      (_, open, main, close) => open + main.replace("function stepRacePhysics() {",
+        "function stepRacePhysics() {\n  if (window.__lapTest?.paused) return;") +
+        "\n(" + installDrivingHarness.toString() + ")();\n" + close);
+    if (instrumented === body) throw new Error("Could not instrument the embedded game module");
+    await route.fulfill({ response, body: instrumented });
+  });
+  await page.goto(gameUrl, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() =>
+    document.querySelector("#scene")?.dataset.view === "menu" ||
+    document.querySelector("#startDescription")?.textContent.startsWith("Could not start game:"),
+    undefined, { timeout: 120000 });
+  const failure = await page.locator("#startDescription").textContent();
+  if (failure?.startsWith("Could not start game:")) throw new Error(failure);
+  console.log(name, "mobile showroom loaded");
+  return { page, shaderErrors };
+}
+
 for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
   const browser = await engine.launch(name === "Chrome" ? { args: ["--enable-webgl", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] } : {});
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-    const shaderErrors = [];
-    page.on("console", message => { if (/shader error|VALIDATE_STATUS|ERROR: 0:/i.test(message.text())) shaderErrors.push(message.text()); });
-    page.on("pageerror", error => console.log(name, "PAGE ERROR:", error.message));
-    page.on("console", message => { if (message.type() === "error") console.log(name, "CONSOLE ERROR:", message.text()); });
-    page.on("requestfailed", request => console.log(name, "REQUEST FAILED:", request.url(), request.failure()?.errorText));
-    const gameUrl = process.env.GAME_TEST_URL ?? "http://127.0.0.1:8000/";
-    await page.route(gameUrl, async route => {
-      const response = await route.fetch();
-      const body = await response.text();
-      const instrumented = body.replace(/(<script[^>]*data-game-module="main\.js"[^>]*>)([\s\S]*?)(<\/script>)/,
-        (_, open, main, close) => open + main.replace("function stepRacePhysics() {",
-          "function stepRacePhysics() {\n  if (window.__lapTest?.paused) return;") +
-          "\n(" + installDrivingHarness.toString() + ")();\n" + close);
-      if (instrumented === body) throw new Error("Could not instrument the embedded game module");
-      await route.fulfill({ response, body: instrumented });
-    });
-    await page.goto(gameUrl, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() =>
-      document.querySelector("#scene")?.dataset.view === "menu" ||
-      document.querySelector("#startDescription")?.textContent.startsWith("Could not start game:"),
-      undefined, { timeout: 120000 });
-    const failure = await page.locator("#startDescription").textContent();
-    if (failure?.startsWith("Could not start game:")) throw new Error(failure);
-    console.log(name, "mobile showroom loaded");
+    let { page, shaderErrors } = await openGamePage(browser, name);
     await page.locator("#carSelect").selectOption({ label: "Cougar" });
     await page.waitForFunction(() => document.querySelector("#scene")?.dataset.selectedCar === "cougar");
-    for (const track of ["nhood1", "nhood2"]) {
-      await page.locator("#menuTrack").selectOption(track);
-      await page.waitForFunction(id => window.revoltMap?.id === id && !document.querySelector("#startBtn").disabled, track, { timeout: 60000 });
-      await page.locator("#startBtn").tap();
-      await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race");
-      const secondLap = await page.evaluate(() => window.__lapTest.drive(0, 1));
-      if (secondLap.hud !== "2/3") throw new Error(`${track}: first lap did not update HUD: ${JSON.stringify(secondLap)}`);
-      const beforeReset = await page.evaluate(() => window.__lapTest.drive(0, 0.55));
-      const reset = page.locator("#resetBtn");
-      if (!await reset.isVisible() || !await reset.isEnabled()) throw new Error(`${track}: Reset button is unavailable`);
-      // Invoke the actual button handler without waiting for software WebKit's
-      // render-frame stability heuristic after sampling an entire circuit.
-      await reset.dispatchEvent("click");
-      const afterReset = await page.evaluate(() => window.__lapTest.completeReset());
-      if (afterReset.lap !== beforeReset.lap || afterReset.checkpoint !== beforeReset.checkpoint)
-        throw new Error(`${track}: Reset erased lap/checkpoint progress`);
-      const thirdLap = await page.evaluate(() => window.__lapTest.drive(0.55, 1));
-      if (thirdLap.hud !== "3/3") throw new Error(`${track}: second lap did not update HUD: ${JSON.stringify(thirdLap)}`);
-      const finish = await page.evaluate(() => window.__lapTest.drive(0, 1));
-      if (!finish.finished || finish.hud !== "3/3") throw new Error(`${track}: third lap did not finish: ${JSON.stringify(finish)}`);
-      console.log(name, track, "HUD advances 1/3 → 2/3 → 3/3 and finishes; Reset preserves checkpoints");
-      await page.locator("#menuBtn").tap();
-    }
-    await page.evaluate(() => { window.__lapTest.paused = false; });
     await page.locator("#menuTrack").selectOption("ship1");
     await page.waitForFunction(() => window.revoltMap?.id === "ship1" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
     await page.locator("#startBtn").tap();
@@ -176,5 +157,33 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await page.locator("#startBtn").tap();
     await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
     console.log(name, "Both Toytanic races loaded with pool water");
+    // Give deterministic lap fixtures their own WebGL/physics world. The live
+    // driving/power-up smoke test above never resumes a sampled/teleported pose.
+    await page.close();
+    ({ page, shaderErrors } = await openGamePage(browser, name));
+    for (const track of ["nhood1", "nhood2"]) {
+      await page.locator("#menuTrack").selectOption(track);
+      await page.waitForFunction(id => window.revoltMap?.id === id && !document.querySelector("#startBtn").disabled, track, { timeout: 60000 });
+      await page.locator("#startBtn").tap();
+      await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race");
+      const secondLap = await page.evaluate(() => window.__lapTest.drive(0, 1));
+      if (secondLap.hud !== "2/3") throw new Error(`${track}: first lap did not update HUD: ${JSON.stringify(secondLap)}`);
+      const beforeReset = await page.evaluate(() => window.__lapTest.drive(0, 0.55));
+      const reset = page.locator("#resetBtn");
+      if (!await reset.isVisible() || !await reset.isEnabled()) throw new Error(`${track}: Reset button is unavailable`);
+      // Invoke the actual button handler without waiting for software WebKit's
+      // render-frame stability heuristic after sampling an entire circuit.
+      await reset.dispatchEvent("click");
+      const afterReset = await page.evaluate(() => window.__lapTest.completeReset());
+      if (afterReset.lap !== beforeReset.lap || afterReset.checkpoint !== beforeReset.checkpoint)
+        throw new Error(`${track}: Reset erased lap/checkpoint progress`);
+      const thirdLap = await page.evaluate(() => window.__lapTest.drive(0.55, 1));
+      if (thirdLap.hud !== "3/3") throw new Error(`${track}: second lap did not update HUD: ${JSON.stringify(thirdLap)}`);
+      const finish = await page.evaluate(() => window.__lapTest.drive(0, 1));
+      if (!finish.finished || finish.hud !== "3/3") throw new Error(`${track}: third lap did not finish: ${JSON.stringify(finish)}`);
+      console.log(name, track, "HUD advances 1/3 → 2/3 → 3/3 and finishes; Reset preserves checkpoints");
+      await page.locator("#menuBtn").tap();
+    }
+    if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
   } finally { await browser.close(); }
 }
