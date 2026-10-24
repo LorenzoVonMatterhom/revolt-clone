@@ -184,7 +184,7 @@ export class PowerupSystem {
     else { mesh = new THREE.Mesh(new THREE.CircleGeometry(8, 24), new THREE.MeshBasicMaterial({ color: 0x121017, transparent: true, opacity: 0.85, depthWrite: false })); mesh.rotation.x = -Math.PI / 2; }
     mesh.position.copy(position); this.group.add(mesh);
     if (kind === "clone") mesh.position.y += 4;
-    const hazard = { kind, mesh, owner: racer, life: 30, armed: 0.7, unique: kind === "oil" };
+    const hazard = { kind, mesh, owner: racer, life: 30, armed: kind === "oil" ? 0 : 0.7, unique: kind === "oil" };
     if (kind === "bearing") {
       hazard.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(...position.toArray()).setLinvel(racer.velocity.x * 0.6, 0, racer.velocity.z * 0.6).setCcdEnabled(true));
       this.physics.world.createCollider(RAPIER.ColliderDesc.ball(3.5).setMass(40).setFriction(0.8).setRestitution(0.2), hazard.body);

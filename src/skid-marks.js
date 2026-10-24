@@ -54,7 +54,11 @@ export class SkidMarks {
       const point = new THREE.Vector3().copy(contact), normal = new THREE.Vector3().copy(contactNormal).normalize();
       if (!previous[i]) previous[i] = point;
       else if (point.distanceTo(previous[i]) > 8) previous[i] = point;
-      else if (this.segment(previous[i], point, normal, Math.max(0.25, racer.car.setup.wheels[i].radius * 0.45), oiledWheel ? 0.9 : 0.6)) previous[i] = point;
+      else {
+        const wheel = racer.car.setup.wheels[i];
+        const width = oiledWheel ? Math.max(0.8, (wheel.halfWidth ?? wheel.radius * 0.35) * 2) : Math.max(0.25, wheel.radius * 0.45);
+        if (this.segment(previous[i], point, normal, width, oiledWheel ? 0.95 : 0.6)) previous[i] = point;
+      }
     }
     this.previous.set(racer, previous);
   }
