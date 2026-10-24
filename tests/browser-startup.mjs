@@ -1,11 +1,15 @@
 import { chromium, webkit } from "playwright";
 
 // Install a fixture inside the game's module scope only in this browser test.
-function installFlipHarness() {
+function installDrivingHarness() {
   // Keep software-rendered WebKit responsive for UI interactions.
   renderer.setPixelRatio(0.5); renderer.shadowMap.enabled = false;
   window.__lapTest = {
+    paused: false,
     drive(from, to) {
+      // Authored position samples own the player pose during lap/HUD checks.
+      // Keep autonomous physics from replacing it between browser actions.
+      this.paused = true;
       const route = makeRaceRoute(loadedLevel.aiRoute);
       const normal = checkpoints[0].normal;
       let phase = 0, closest = Infinity;
@@ -79,7 +83,9 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       const response = await route.fetch();
       const body = await response.text();
       const instrumented = body.replace(/(<script[^>]*data-game-module="main\.js"[^>]*>)([\s\S]*?)(<\/script>)/,
-        (_, open, main, close) => open + main + "\n(" + installFlipHarness.toString() + ")();\n" + close);
+        (_, open, main, close) => open + main.replace("function stepRacePhysics() {",
+          "function stepRacePhysics() {\n  if (window.__lapTest?.paused) return;") +
+          "\n(" + installDrivingHarness.toString() + ")();\n" + close);
       if (instrumented === body) throw new Error("Could not instrument the embedded game module");
       await route.fulfill({ response, body: instrumented });
     });
@@ -101,7 +107,11 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       const secondLap = await page.evaluate(() => window.__lapTest.drive(0, 1));
       if (secondLap.hud !== "2/3") throw new Error(`${track}: first lap did not update HUD: ${JSON.stringify(secondLap)}`);
       const beforeReset = await page.evaluate(() => window.__lapTest.drive(0, 0.55));
-      await page.locator("#resetBtn").tap();
+      const reset = page.locator("#resetBtn");
+      if (!await reset.isVisible() || !await reset.isEnabled()) throw new Error(`${track}: Reset button is unavailable`);
+      // Invoke the actual button handler without waiting for software WebKit's
+      // render-frame stability heuristic after sampling an entire circuit.
+      await reset.dispatchEvent("click");
       const afterReset = await page.evaluate(() => window.__lapTest.completeReset());
       if (afterReset.lap !== beforeReset.lap || afterReset.checkpoint !== beforeReset.checkpoint)
         throw new Error(`${track}: Reset erased lap/checkpoint progress`);
@@ -112,6 +122,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       console.log(name, track, "HUD advances 1/3 → 2/3 → 3/3 and finishes; Reset preserves checkpoints");
       await page.locator("#menuBtn").tap();
     }
+    await page.evaluate(() => { window.__lapTest.paused = false; });
     await page.locator("#menuTrack").selectOption("ship1");
     await page.waitForFunction(() => window.revoltMap?.id === "ship1" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
     await page.locator("#startBtn").tap();
