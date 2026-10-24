@@ -35,3 +35,20 @@ test("turning and bumps move the tip, and reset teleports keep it finite", () =>
   assert.ok(aerial.points[0].distanceTo(car.localToWorld(aerial.offset.clone())) < 0.00001);
   assert.ok(aerial.tip.position.distanceTo(new THREE.Vector3(0, 3, -1)) < 0.00001);
 });
+
+test("bomb burns the antenna down from its moving tip and restores it", () => {
+  const { aerial } = antenna();
+  const full = aerial.tip.position.clone();
+  aerial.setFuseRemaining(.5);
+  assert.equal(aerial.rods.filter(rod => rod.visible).length, 4);
+  assert.ok(aerial.tip.position.y < full.y);
+  assert.equal(aerial.tip.material.color.getHex(), 0xffae32);
+  aerial.update(1/60);
+  assert.equal(aerial.rods.filter(rod => rod.visible).length, 4);
+  aerial.setFuseRemaining(.01);
+  assert.equal(aerial.rods.filter(rod => rod.visible).length, 1);
+  aerial.setFuseRemaining(null);
+  assert.ok(aerial.rods.every(rod => rod.visible));
+  assert.ok(aerial.tip.position.distanceTo(full) < .02);
+  assert.equal(aerial.tip.material.color.getHex(), 0xd3272e);
+});

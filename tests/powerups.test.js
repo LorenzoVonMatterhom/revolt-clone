@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { FlexibleAntenna } from "../src/car-effects.js";
 import { LEVELS } from "../src/levels.js";
 import { parseObjects, parseInfo, loadCar } from "../src/revolt.js";
 import { initializePhysics, MeshPhysics } from "../src/physics.js";
@@ -452,5 +453,43 @@ test("electric lightning follows body surfaces, preserves paint, and affects sho
     f.system.reset(f.racers);
     assert.equal(overlay.parent,null);
     assert.equal(racer.mesh.material,original);
+  } finally { f.cleanup(); }
+});
+
+test("ticking bomb leaves the item slot free and transferring it preserves held power-ups", () => {
+  const f = fixture();
+  try {
+    const owner = f.racers[0], other = f.racers[1];
+    awardPowerup(owner.powerups,power("bomb"),false);
+    assert.ok(awardPowerup(owner.powerups,power("fireworks"),false));
+    assert.ok(f.system.fire(owner,f.racers));
+    assert.ok(owner.powerups.bomb > 0);
+    awardPowerup(other.powerups,power("battery"),false);
+    other.position.set(6,2,0);
+    f.system.update(.01,f.racers);
+    assert.equal(owner.powerups.bomb,0);
+    assert.ok(other.powerups.bomb>0);
+    assert.equal(other.powerups.held.id,"battery");
+    assert.equal(owner.powerups.held.id,"fireworks");
+    assert.ok(f.system.fire(other,f.racers));
+    assert.ok(other.powerups.boost>0);
+    assert.ok(other.powerups.bomb>0);
+  } finally { f.cleanup(); }
+});
+
+test("bomb countdown burns the real flexible antenna and restores it after explosion", () => {
+  const f = fixture(), racer = f.racers[0];
+  const antenna = racer.mesh.userData.antenna = new FlexibleAntenna(racer.mesh, {
+    offset: new THREE.Vector3(0,2,-1), direction: new THREE.Vector3(0,1,0), length: 4,
+  });
+  try {
+    awardPowerup(racer.powerups,power("bomb"),false);
+    f.system.update(5,f.racers);
+    assert.equal(antenna.fuseFraction,.5);
+    assert.equal(antenna.rods.filter(rod=>rod.visible).length,4);
+    assert.equal(racer.mesh.userData.bombFuse,undefined);
+    f.system.update(5,f.racers);
+    assert.equal(antenna.fuseFraction,null);
+    assert.ok(antenna.rods.every(rod=>rod.visible));
   } finally { f.cleanup(); }
 });

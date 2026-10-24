@@ -171,15 +171,29 @@ export class FlexibleAntenna {
     this.draw();
   }
 
+  setFuseRemaining(fraction = null) {
+    this.fuseFraction = fraction === null ? null : THREE.MathUtils.clamp(fraction, 0, 1);
+    this.car.updateMatrixWorld(true);
+    this.draw();
+  }
+
   draw() {
     const local = this.points.map(point => this.car.worldToLocal(point.clone()));
     const axis = new THREE.Vector3(0, 1, 0);
     this.rods.forEach((rod, i) => {
-      const delta = local[i + 1].clone().sub(local[i]);
-      rod.position.copy(local[i]).add(local[i + 1]).multiplyScalar(0.5);
+      const remaining = (this.fuseFraction ?? 1) * this.count;
+      rod.visible = i < remaining;
+      const end = local[i].clone().lerp(local[i + 1], THREE.MathUtils.clamp(remaining - i, 0, 1));
+      const delta = end.clone().sub(local[i]);
+      rod.position.copy(local[i]).add(end).multiplyScalar(0.5);
       rod.scale.y = delta.length() / this.segmentLength;
       if (delta.lengthSq() > 0) rod.quaternion.setFromUnitVectors(axis, delta.normalize());
     });
-    this.tip.position.copy(local[this.count]);
+    const remaining = (this.fuseFraction ?? 1) * this.count;
+    const segment = Math.min(this.count - 1, Math.floor(remaining));
+    this.tip.position.copy(local[segment]).lerp(local[segment + 1], remaining - segment);
+    this.tip.visible = remaining > 0;
+    this.tip.material.color.set(this.fuseFraction === null || this.fuseFraction === undefined ? 0xd3272e : 0xffae32);
+    this.tip.scale.setScalar(this.fuseFraction === null || this.fuseFraction === undefined ? 1 : 1.6);
   }
 }
