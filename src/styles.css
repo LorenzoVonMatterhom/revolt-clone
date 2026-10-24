@@ -260,7 +260,7 @@ select:focus-visible {
 .debug-panel select { width: 100%; max-width: none; font-size: 13px; }
 .debug-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin-top: 8px; }
 .debug-actions button { padding: 0 6px; font-size: 13px; border-radius: 4px; }
-.debug-panel output { display: block; margin-top: 8px; min-height: 18px; font-size: 12px; color: #f1c94b; overflow-wrap: anywhere; }
+.debug-panel #debugStatus { display: block; margin-top: 8px; min-height: 18px; font-size: 12px; color: #f1c94b; overflow-wrap: anywhere; }
 @media (max-width:760px) { .debug-panel { top: 276px; width: 220px; padding: 10px; } }
 .start h2 { font-size: 20px; text-transform: uppercase; color: #f1c94b; margin: 24px 0 12px; }
 .start h3 { font-size: 20px; color: #f1c94b; margin: 20px 0 14px; }
@@ -330,3 +330,9 @@ select:focus-visible {
     max-width: 100%;
   }
 }
+
+.debug-panel h2 { margin-bottom: 6px; font-size: 14px; }
+.debug-panel h2 button { min-height: 36px; padding: 0 8px; font-size: 12px; }
+.debug-panel.is-collapsed > :not(h2) { display: none; }
+.debug-panel select { min-height: 40px; }
+.debug-panel { z-index: 8; }

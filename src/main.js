@@ -37,6 +37,11 @@ const powerName = document.querySelector("#powerName");
 const powerStatus = document.querySelector("#powerStatus");
 const debugPowerup = document.querySelector("#debugPowerup");
 const debugStatus = document.querySelector("#debugStatus");
+document.querySelector("#debugToggle").addEventListener("click", event => {
+  const collapsed = document.querySelector("#debugPanel").classList.toggle("is-collapsed");
+  event.currentTarget.textContent = collapsed ? "Show" : "Hide";
+  event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
+});
 let lastPowerIcon;
 let powerups;
 let powerAssets;
@@ -661,7 +666,8 @@ function updateHud() {
     powerStatus.textContent = state.bomb > 0 ? `${state.bomb.toFixed(1)} s` : state.disabled > 0 ? `Power cut: ${state.disabled.toFixed(1)} s` : state.boost > 0 ? `Turbo: ${state.boost.toFixed(1)} s` : state.electro > 0 ? `Pulse: ${state.electro.toFixed(1)} s` : state.shots > 0 ? `${state.shots} / ${state.held.shots}` : "";
     powerBtn.disabled = !state.held || state.rolling > 0 || state.cooldown > 0 || !raceStarted;
     touchControls.setFireEnabled(!powerBtn.disabled);
-    debugStatus.textContent = `${powerName.textContent}${powerStatus.textContent ? ` - ${powerStatus.textContent}` : ""}`;
+    const debugLabel = `${powerName.textContent}${powerStatus.textContent ? ` - ${powerStatus.textContent}` : ""}`;
+    if (debugStatus.textContent !== debugLabel) debugStatus.textContent = debugLabel;
     document.querySelector("#debugUse").disabled = powerBtn.disabled;
   }
 }

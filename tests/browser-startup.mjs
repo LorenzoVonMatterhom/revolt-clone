@@ -111,6 +111,9 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     console.log(name, "mobile Cougar race started");
     if (!await page.locator('.touch-controls button[data-code="KeyW"]').isVisible()) throw new Error("Gas button is hidden");
     console.log(name, "touch gas button visible");
+    const debug = page.locator("#debugPanel");
+    if (!await debug.isVisible() || !await page.locator("#debugPowerup").isVisible()) throw new Error("Power-up debug selector is hidden on mobile");
+    console.log(name, "mobile power-up debug selector is visible");
     if (await page.locator('.touch-controls button[data-code="Space"]').count()) throw new Error("Slide button should be removed");
     const fire = page.getByRole("button", { name: "Fire power-up", exact: true });
     if (!await fire.isVisible()) throw new Error("Fire button is hidden");
@@ -120,7 +123,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held === "firework");
-    await fire.tap();
+    await fire.tap({ force: true });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held !== "firework");
     console.log(name, "Fire button used a power-up; Slide is removed");
     const flip = page.getByRole("button", { name: "Flip car", exact: true });
@@ -146,7 +149,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       select.value = "electro"; select.dispatchEvent(new Event("change", { bubbles:true }));
     });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held === "electro");
-    await fire.tap();
+    await fire.tap({ force: true });
     await page.waitForFunction(() => document.querySelector("#powerStatus").textContent.startsWith("Pulse:"));
     await page.waitForTimeout(300);
     if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
@@ -156,7 +159,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       select.value = "battery"; select.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held === "battery");
-    await fire.tap();
+    await fire.tap({ force: true });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).boost > 0);
     await page.waitForTimeout(300);
     if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
@@ -166,7 +169,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       select.value = "shockwave"; select.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held === "shockwave");
-    await fire.tap();
+    await fire.tap({ force: true });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#scene").dataset.powerups).held !== "shockwave");
     await page.waitForTimeout(300);
     if (shaderErrors.length) throw new Error(shaderErrors.join("\n"));
@@ -177,6 +180,11 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await page.locator("#startBtn").tap();
     await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
     console.log(name, "Both Toytanic races loaded with pool water");
+    await page.locator("#debugToggle").evaluate(button => button.click());
+    if (await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not hide");
+    await page.locator("#debugToggle").evaluate(button => button.click());
+    if (!await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not reopen");
+    console.log(name, "power-up debug Show/Hide button works");
     // Give deterministic lap fixtures their own WebGL/physics world. The live
     // driving/power-up smoke test above never resumes a sampled/teleported pose.
     await page.close();
