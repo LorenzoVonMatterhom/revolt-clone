@@ -223,8 +223,7 @@ export class MeshPhysics {
     const rotation = new THREE.Quaternion().copy(car.body.rotation());
     const velocity = car.body.linvel();
     if (![...position.toArray(), ...rotation.toArray(), velocity.x, velocity.y, velocity.z].every(Number.isFinite)) {
-      this.recoverCar(car);
-      return;
+      return this.recoverCar(car);
     }
     const roadContact = this.terrain ? car.collider.contactCollider(this.terrain, 0) : null;
     const contacts = [
@@ -252,8 +251,7 @@ export class MeshPhysics {
     // terrain or another car. AI recovery and upright penetration repair remain.
     const mayRecover = car.autoRighting || upright >= 0.25;
     if (mayRecover && (car.embeddedTime > 0.35 || car.blockedTime > 1.5 || car.stackedTime>0.75) && car.safePose) {
-      this.recoverCar(car);
-      return;
+      return this.recoverCar(car);
     }
     // Keep a previously clear resting pose, not the latest position pressed into a wall.
     if (!roadContact && !obstacleContact && !deeplyEmbedded && upright > 0.7 && Math.hypot(velocity.x, velocity.z) > 2 && car.vehicle.numWheels() > 0 && Array.from({ length: car.vehicle.numWheels() }, (_, i) => car.vehicle.wheelIsInContact(i)).filter(Boolean).length >= 2) {

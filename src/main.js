@@ -10,6 +10,7 @@ import { CarEngineAudio, engineProfile, setWheelPose, CarResetFade } from "./car
 import { Showroom } from "./showroom.js";
 import { PowerupSystem, POWERUPS } from "./powerups.js";
 import { RaceAI, makeRaceRoute, makeAiRoute, findAiRecovery } from "./race-ai.js";
+import { makeLapGates, LapProgress } from "./lap-progress.js";
 import { SkidMarks, isSkidding } from "./skid-marks.js";
 
 const canvas = document.querySelector("#scene");
@@ -44,7 +45,6 @@ let showroom;
 let selectedCarId = "rc";
 let playerCarId = "rc";
 
-const CHECKPOINT_RADIUS = 13.5;
 const TOTAL_LAPS = 3;
 const PHYSICS_STEP = 1 / 120;
 let physicsAccumulator = 0;
@@ -197,7 +197,8 @@ async function buildLevel(level) {
       centerline = Array.from({ length: samples }, (_, i) => curve.getPointAt(i / samples));
       tangents = Array.from({ length: samples }, (_, i) => curve.getTangentAt(i / samples).normalize());
       normals = tangents.map((t) => new THREE.Vector3(-t.z, 0, t.x).normalize());
-      checkpoints = [0, 45, 90, 135, 180, 225, 270, 315].map((index) => ({ index, position: centerline[index].clone() }));
+      const heading = (loaded.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
+      checkpoints = makeLapGates(loaded.aiRoute, new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading)));
     } else {
       centerline = [];
       tangents = [];
@@ -292,9 +293,9 @@ class CarController {
     this.finished = false;
     this.nextCheckpoint = 1;
     this.progress = 0;
-    this.distanceTravelled = 0;
     this.lastTrackIndex = 0;
     this.placeScore = 0;
+    this.lapTracker = this.isPlayer ? new LapProgress(checkpoints, TOTAL_LAPS) : null;
     this.resetTo(0, options.startOffset || 0, (samples - (options.startIndex || samples)) / 6);
   }
 
@@ -320,17 +321,17 @@ class CarController {
     if (!placed) physics.placeCar(this.car, new THREE.Vector3(), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (loadedLevel.info.STARTROT?.[0] ?? 0) * Math.PI * 2));
     this.syncPhysics();
     this.lastTrackIndex = index;
-    this.nextCheckpoint = 1;
+    this.lapTracker?.relocate(this.position);
   }
 
   restart(index, offset = 0) {
     this.ai = new RaceAI(loadedLevel.aiRoute, this.aiSpeed, this.mesh.userData.physics);
     this.resetTo(0, offset, (samples - (index || samples)) / 6);
+    this.lapTracker?.reset(checkpoints, this.position);
     this.lap = 1;
     this.finished = false;
     this.nextCheckpoint = 1;
     this.progress = 0;
-    this.distanceTravelled = 0;
     this.placeScore = 0;
     this.bumpCooldown = 0;
   }
@@ -431,29 +432,14 @@ class CarController {
       }
       return;
     }
-    let delta = trackData.index - this.lastTrackIndex;
-    if (delta < -samples / 2) delta += samples;
-    if (delta > samples / 2) delta -= samples;
-    if (delta > 0) this.distanceTravelled += delta;
+    this.lapTracker.update(this.position);
+    this.lap = this.lapTracker.lap;
+    this.nextCheckpoint = this.lapTracker.nextCheckpoint;
+    this.finished = this.lapTracker.finished;
     this.lastTrackIndex = trackData.index;
     this.progress = trackData.index / samples;
-
-    const checkpoint = checkpoints[this.nextCheckpoint];
-    if (this.position.distanceTo(checkpoint.position) < CHECKPOINT_RADIUS) {
-      this.nextCheckpoint += 1;
-      if (this.nextCheckpoint >= checkpoints.length) this.nextCheckpoint = 0;
-    }
-
-    if (trackData.index < 8 && this.nextCheckpoint === 0 && this.velocity.length() > 4) {
-      this.lap += 1;
-      this.nextCheckpoint = 1;
-      if (this.lap > TOTAL_LAPS) {
-        this.finished = true;
-        this.velocity.multiplyScalar(0.25);
-      }
-    }
-
-    this.placeScore = (this.lap - 1) * samples + this.distanceTravelled;
+    this.placeScore = (this.lap - 1 + this.progress) * samples;
+    if (this.finished) physics.updateVehicle(this.car, PHYSICS_STEP, 0, 1, 0, false);
   }
 
   interact(speed, handbrake) {
@@ -596,6 +582,7 @@ function flipPlayer() {
   if (sounds.skid.isPlaying) sounds.skid.stop();
   if (sounds.scrape.isPlaying) sounds.scrape.stop();
   player.syncPhysics();
+  player.lapTracker.relocate(player.position);
 }
 
 function resetPlayer() {
@@ -715,7 +702,12 @@ function drawMinimap() {
 function stepRacePhysics() {
   for (const racer of racers) racer.update(PHYSICS_STEP);
   physics.step();
-  for (const racer of racers) { physics.checkCar(racer.car, PHYSICS_STEP, racers.map(other=>other.car)); racer.syncPhysics(); skidMarks.track(racer); }
+  for (const racer of racers) {
+    const recovered = physics.checkCar(racer.car, PHYSICS_STEP, racers.map(other => other.car));
+    racer.syncPhysics();
+    if (recovered) racer.lapTracker?.relocate(racer.position);
+    skidMarks.track(racer);
+  }
   powerups.update(PHYSICS_STEP, racers);
 }
 
@@ -727,7 +719,7 @@ function animate() {
     new THREE.Vector3(0, 1, 0).applyQuaternion(player.mesh.quaternion).y <= 0.7;
   flipBtn.disabled = !canFlip;
   touchControls.setFlipEnabled(canFlip);
-  if (raceStarted) elapsedRace += dt;
+  if (raceStarted && !player.finished) elapsedRace += dt;
 
   if (raceStarted && !levelLoading) {
     physicsAccumulator += dt;
