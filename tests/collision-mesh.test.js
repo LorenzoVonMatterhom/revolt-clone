@@ -193,3 +193,29 @@ test("Neighborhood 1 sidewalk descents do not launch cars at the curb lip", asyn
     }
   }finally{disposeLevel(level);globalThis.fetch=realFetch;}
 });
+
+test("Humma clears the Neighborhood 1 car-jump approach without a repeating respawn loop", async () => {
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  const manifest=readdirSync('levels',{recursive:true}).map(path=>'/levels/'+path.replaceAll('\\','/'));
+  let level,mesh;
+  try {
+    level=await loadLevel({id:'nhood1'},manifest);mesh=await loadCar('sugo','Humma');
+    for(const speed of [0,60,120]) {
+      const physics=new MeshPhysics(level.group),car=physics.createCar(mesh,{autoRighting:false});
+      try {
+        assert.ok(physics.placeCar(car,new THREE.Vector3(1650,0,-1660),new THREE.Quaternion()));
+        car.body.setLinvel({x:0,y:0,z:speed},true);
+        const place=physics.placeCar.bind(physics);let recoveries=0,furthest=-Infinity;
+        physics.placeCar=(...args)=>{recoveries++;return place(...args);};
+        for(let i=0;i<1200;i++) {
+          physics.updateVehicle(car,1/120,1,0,0,false,1,2.1);physics.step();
+          physics.checkCar(car,1/120);furthest=Math.max(furthest,car.body.translation().z);
+        }
+        assert.ok(recoveries<=1,`Humma at speed ${speed} respawned ${recoveries} times in ten seconds`);
+        assert.ok(furthest> -1600,`Humma at speed ${speed} remained locked on the jump approach`);
+        if(speed===0)assert.equal(recoveries,0,'Normal acceleration into the jump must not trigger recovery');
+      }finally{physics.dispose();}
+    }
+  }finally{disposeLevel(level);mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});globalThis.fetch=realFetch;}
+});
