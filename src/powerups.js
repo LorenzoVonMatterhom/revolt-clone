@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { updateBatteryGlow, disposeBatteryGlow } from "./battery-glow.js";
 import { createElectricPulse, disposeElectricPulse } from "./electric-pulse.js";
 import { gameAssetUrl } from "./assets.js";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -83,7 +84,7 @@ export class PowerupSystem {
   setBombAppearance(racer, active) {
     const fuse = racer.mesh.userData.bombFuse;
     racer.mesh.traverse(object => {
-      if (!object.material || fuse?.getObjectById(object.id)) return;
+      if (!object.material || object.userData.batteryGlowFX || fuse?.getObjectById(object.id)) return;
       if (active && !object.userData.bombOriginalMaterial) {
         object.userData.bombOriginalMaterial = object.material;
         const black = material => object.isLine
@@ -100,6 +101,7 @@ export class PowerupSystem {
   }
 
   restoreCar(racer) {
+    disposeBatteryGlow(racer.mesh);
     this.setBombAppearance(racer, false);
     disposeElectricPulse(racer.mesh);
     if (racer.mesh.userData.bombFuse) {
@@ -194,7 +196,7 @@ export class PowerupSystem {
     this.playSound(powerup.sound, racer.position);
     if (["shockwave", "firework", "fireworks", "balloons"].includes(powerup.id)) this.spawnProjectile(racer, powerup.id === "fireworks" ? "firework" : powerup.id);
     else if (["oil", "bearing", "clone"].includes(powerup.id)) this.dropHazard(racer, powerup.id);
-    else if (powerup.id === "battery") { state.boost = 8; state.disabled = 0; }
+    else if (powerup.id === "battery") { state.boost = 8; state.disabled = 0; updateBatteryGlow(racer.mesh, true, this.time, state.boost); }
     else if (powerup.id === "electro") { state.electro = 8; this.updateElectricPulse(racer); }
     else if (powerup.id === "star") {
       for (const other of racers) if (other !== racer) other.powerups.disabled = 4;
@@ -252,6 +254,7 @@ export class PowerupSystem {
           }
         }
       }
+      updateBatteryGlow(racer.mesh, state.boost > 0 && state.bomb === 0, this.time, state.boost);
       this.setBombAppearance(racer, state.bomb > 0);
       racer.mesh.traverse((object) => {
         if (state.bomb > 0 || !object.material?.color) return;
