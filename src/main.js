@@ -660,10 +660,10 @@ function updateHud() {
   timeEl.textContent = formatTime(elapsedRace);
   const state = player.powerups;
   if (state) {
-    const icon = state.bomb > 0 ? POWERUPS[3] : state.rolling > 0 ? POWERUPS[Math.floor(elapsedRace * 12) % 10] : state.held;
+    const icon = state.rolling > 0 ? POWERUPS[Math.floor(elapsedRace * 12) % 10] : state.held;
     if (icon !== lastPowerIcon) { powerups.drawIcon(powerIcon, icon); lastPowerIcon = icon; }
-    powerName.textContent = state.bomb > 0 ? "Bomb" : state.rolling > 0 ? "Selecting..." : state.held?.name ?? "No Pick Up";
-    powerStatus.textContent = state.bomb > 0 ? `${state.bomb.toFixed(1)} s` : state.disabled > 0 ? `Power cut: ${state.disabled.toFixed(1)} s` : state.boost > 0 ? `Turbo: ${state.boost.toFixed(1)} s` : state.electro > 0 ? `Pulse: ${state.electro.toFixed(1)} s` : state.shots > 0 ? `${state.shots} / ${state.held.shots}` : "";
+    powerName.textContent = state.rolling > 0 ? "Selecting..." : state.held?.name ?? "No Pick Up";
+    powerStatus.textContent = state.disabled > 0 ? `Power cut: ${state.disabled.toFixed(1)} s` : state.boost > 0 ? `Turbo: ${state.boost.toFixed(1)} s` : state.electro > 0 ? `Pulse: ${state.electro.toFixed(1)} s` : state.shots > 0 ? `${state.shots} / ${state.held.shots}` : "";
     powerBtn.disabled = !state.held || state.rolling > 0 || state.cooldown > 0 || !raceStarted;
     touchControls.setFireEnabled(!powerBtn.disabled);
     const debugLabel = `${powerName.textContent}${powerStatus.textContent ? ` - ${powerStatus.textContent}` : ""}`;

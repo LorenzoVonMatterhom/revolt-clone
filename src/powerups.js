@@ -30,7 +30,7 @@ export function createPowerState() {
   return { held: null, shots: 0, rolling: 0, cooldown: 0, boost: 0, disabled: 0, slippery: 0, electro: 0, bomb: 0, bombLock: 0 };
 }
 export function awardPowerup(state, powerup, roulette = true) {
-  if (state.held || state.bomb > 0 || state.rolling > 0) return false;
+  if (state.held || state.rolling > 0 || (state.bomb > 0 && powerup.id === "bomb")) return false;
   state.held = powerup; state.shots = powerup.shots; state.rolling = roulette ? 1 : 0;
   if (powerup.id === "bomb" && !roulette) { state.bomb = 10; state.held = null; state.shots = 0; }
   return true;
@@ -103,6 +103,8 @@ export class PowerupSystem {
   }
 
   restoreCar(racer) {
+    racer.mesh.userData.antenna?.setFuseRemaining(null);
+    delete racer.mesh.userData.bombBurning;
     disposeBatteryGlow(racer.mesh);
     this.setBombAppearance(racer, false);
     disposeElectricPulse(racer.mesh);
@@ -251,7 +253,6 @@ export class PowerupSystem {
           const other = racers.find((other) => other !== racer && other.powerups.bomb === 0 && other.powerups.bombLock === 0 && other.position.distanceTo(racer.position) < 12);
           if (other) {
             other.powerups.bomb = state.bomb; other.powerups.bombLock = 1;
-            other.powerups.held = null; other.powerups.shots = 0; other.powerups.rolling = 0;
             state.bomb = 0; state.bombLock = 1;
           }
         }
@@ -272,13 +273,14 @@ export class PowerupSystem {
         }
       }
       if (state.bomb > 0) {
-        if (!racer.mesh.userData.bombFuse) {
-          const fuse = this.assets.models.fuse.clone(true);
-          fuse.position.set(0, 5, -2); racer.mesh.add(fuse); racer.mesh.userData.bombFuse = fuse;
+        racer.mesh.userData.bombBurning = true;
+        const antenna = racer.mesh.userData.antenna;
+        antenna?.setFuseRemaining(state.bomb / 10);
+        if (Math.floor(this.time * 5) !== Math.floor((this.time - dt) * 5)) {
+          const spark = antenna ? racer.mesh.localToWorld(antenna.tip.position.clone()) : racer.position.clone().add(new THREE.Vector3(0, 6, 0));
+          this.flash(spark, 0xff9b21, 1.2);
         }
-        racer.mesh.userData.bombFuse.scale.set(1, state.bomb / 10, 1);
-        if (Math.floor(this.time * 5) !== Math.floor((this.time - dt) * 5)) this.flash(racer.position.clone().add(new THREE.Vector3(0, 6, 0)), 0xff9b21, 2);
-      } else if (racer.mesh.userData.bombFuse) this.restoreCar(racer);
+      } else if (racer.mesh.userData.bombBurning) this.restoreCar(racer);
       if (!racer.isPlayer && state.held && state.rolling === 0 && state.cooldown === 0) this.fire(racer, racers);
     }
     for (const pickup of this.pickups) {
