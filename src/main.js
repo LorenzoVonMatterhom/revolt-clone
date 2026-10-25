@@ -205,7 +205,7 @@ async function buildLevel(level) {
       tangents = Array.from({ length: samples }, (_, i) => curve.getTangentAt(i / samples).normalize());
       normals = tangents.map((t) => new THREE.Vector3(-t.z, 0, t.x).normalize());
       const heading = (loaded.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
-      checkpoints = makeLapGates(loaded.aiRoute, new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading)));
+      checkpoints = makeLapGates(loaded.aiRoute, new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading)), { corridor: loaded.aiTrack, nodes: loaded.aiNodes });
     } else {
       centerline = [];
       tangents = [];

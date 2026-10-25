@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { readFileSync } from "node:fs";
 import { makeLapGates, LapProgress } from "../src/lap-progress.js";
 import { makeRaceRoute } from "../src/race-ai.js";
-import { parseAiPositions, parseInfo } from "../src/revolt.js";
+import { parseAiNodes, makeAiTrack, parseInfo } from "../src/revolt.js";
 import { LEVELS } from "../src/levels.js";
 
 const points = [[10,0,0],[200,0,0],[200,0,200],[-200,0,200],[-200,0,0]].map(p=>new THREE.Vector3(...p));
@@ -100,10 +100,11 @@ for(const definition of LEVELS.filter(level=>level.kind==='race'&&level.id!=='st
     const base=`levels/${definition.id}/${definition.id}`;
     const info=parseInfo(readFileSync(base+'.inf','utf8'));
     const bytes=readFileSync(base+'.fan');
-    const path=parseAiPositions(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),info.STARTPOS);
+    const nodes=parseAiNodes(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),info.STARTPOS);
+    const corridor=makeAiTrack(nodes), path=corridor.map(node=>node.position);
     const heading=info.STARTROT[0]*Math.PI*2;
     const normal=new THREE.Vector3(Math.sin(heading),0,Math.cos(heading));
-    const tracker=new LapProgress(makeLapGates(path,normal));
+    const tracker=new LapProgress(makeLapGates(path,normal,{corridor,nodes}));
     const curve=makeRaceRoute(path);
     let phase=0,best=Infinity;
     for(let i=1;i<=4000;i++) {
@@ -116,7 +117,7 @@ for(const definition of LEVELS.filter(level=>level.kind==='race'&&level.id!=='st
     for(let lap=1;lap<=3;lap++){travel(tracker,curve,phase+.0001,phase+1.0001);assert.equal(tracker.lap,lap+1,`Failed player lap ${lap}, next gate ${tracker.nextCheckpoint}`);}
     assert.equal(tracker.finished,true);
     for (const lane of [-12, 12]) {
-      const offsetTracker = new LapProgress(makeLapGates(path, normal));
+      const offsetTracker = new LapProgress(makeLapGates(path, normal, {corridor,nodes}));
       travel(offsetTracker, curve, phase - .01, phase + 1.01, lane);
       assert.equal(offsetTracker.lap, 2, `Driving line offset ${lane} must still count, next gate ${offsetTracker.nextCheckpoint}`);
     }
@@ -133,3 +134,38 @@ for(const definition of LEVELS.filter(level=>level.kind==='race'&&level.id!=='st
   travel(leader, route, .4, 1);
   assert.ok(leader.score(route.getPointAt(0)) > follower.score(route.getPointAt(.6)));
 });
+
+// Follow the original FAN corridor edges and alternate branch links, rather
+// than testing only the same ideal racing line used to generate checkpoints.
+for (const {id} of LEVELS.filter(level=>level.kind==='race'&&level.id!=='stunts')) {
+  test(`${id}: both route choices and the full authored road width count every lap`, () => {
+    const base=`levels/${id}/${id}`, info=parseInfo(readFileSync(base+'.inf','utf8'));
+    const bytes=readFileSync(base+'.fan');
+    const nodes=parseAiNodes(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),info.STARTPOS);
+    const corridor=makeAiTrack(nodes), normal=new THREE.Vector3(Math.sin(info.STARTROT[0]*Math.PI*2),0,Math.cos(info.STARTROT[0]*Math.PI*2));
+    const gates=makeLapGates(corridor.map(node=>node.position),normal,{corridor,nodes});
+    for (const alternative of [false,true]) {
+      if (alternative) nodes.forEach(node=>node.next.reverse());
+      const branch=makeAiTrack(nodes);
+      assert.ok(branch.at(-1).next.includes(nodes.indexOf(branch[0])), 'The circuit must close using a real FAN link');
+      for (const lane of [0,.1,.5,.9,1]) {
+        const route=makeRaceRoute(branch.map(node=>node.left.clone().lerp(node.right,lane)));
+        let phase=0, closest=Infinity;
+        for(let i=1;i<=4000;i++) {
+          const a=route.getPointAt((i-1)/4000),b=route.getPointAt(i/4000);
+          const from=a.clone().sub(gates[0].position).dot(normal),to=b.clone().sub(gates[0].position).dot(normal);
+          if(from>=0||to<0)continue;
+          const fraction=from/(from-to), at=a.clone().lerp(b,fraction);
+          const distance=at.distanceToSquared(gates[0].position);
+          if(distance<closest){closest=distance;phase=(i-1+fraction)/4000;}
+        }
+        const tracker=new LapProgress(gates);
+        for(let lap=1;lap<=3;lap++) {
+          travel(tracker,route,phase+.0001,phase+1.0001);
+          assert.equal(tracker.lap,lap+1, `Branch ${alternative}, lane ${lane}, lap ${lap}, blocked at gate ${tracker.nextCheckpoint}`);
+        }
+        assert.equal(tracker.finished,true);
+      }
+    }
+  });
+}

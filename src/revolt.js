@@ -112,7 +112,7 @@ export function parseInfo(text) {
   return info;
 }
 
-export function parseAiPositions(buffer, origin = [0, 0, 0]) {
+export function parseAiNodes(buffer, origin = [0, 0, 0]) {
   if (buffer.byteLength <= 4) return [];
   const view = new DataView(buffer), count = view.getInt16(0, true);
   if (count <= 0 || buffer.byteLength !== 12 + count * 76) throw new Error("Invalid stock Re-Volt FAN file");
@@ -121,17 +121,35 @@ export function parseAiPositions(buffer, origin = [0, 0, 0]) {
     const readVector = (at) => [0, 1, 2].map((axis) => view.getFloat32(at + axis * 4, true));
     const left = new THREE.Vector3(...converted(readVector(offset + 40), origin));
     const right = new THREE.Vector3(...converted(readVector(offset + 56), origin));
-    return { position: left.lerp(right, THREE.MathUtils.clamp(view.getFloat32(offset + 4, true), 0, 1)), next: [view.getInt32(offset + 28, true), view.getInt32(offset + 32, true)] };
+    return { left, right, position: left.clone().lerp(right, THREE.MathUtils.clamp(view.getFloat32(offset + 4, true), 0, 1)), next: [view.getInt32(offset + 28, true), view.getInt32(offset + 32, true)] };
   });
+  return nodes;
+}
+
+export function makeAiTrack(nodes) {
+  if (!nodes.length) return [];
   let start = 0;
   nodes.forEach((node, i) => { if (node.position.lengthSq() < nodes[start].position.lengthSq()) start = i; });
-  const path = [], seen = new Set();
-  let index = start;
-  while (nodes[index] && !seen.has(index)) {
-    seen.add(index); path.push(nodes[index].position);
-    index = nodes[index].next.find((next) => next >= 0 && next < count);
+  // A first-choice branch may loop back into itself before reaching the start.
+  // Follow an actual closed circuit through the start, trying alternate exits.
+  const path = [], visited = new Set();
+  function visit(index) {
+    if (index === start && path.length > 2) return true;
+    if (!nodes[index] || visited.has(index)) return false;
+    visited.add(index); path.push(nodes[index]);
+    for (const next of nodes[index].next) if (next >= 0 && visit(next)) return true;
+    path.pop();
+    return false;
   }
-  return path;
+  return visit(start) ? path : [];
+}
+
+export function parseAiTrack(buffer, origin = [0, 0, 0]) {
+  return makeAiTrack(parseAiNodes(buffer, origin));
+}
+
+export function parseAiPositions(buffer, origin = [0, 0, 0]) {
+  return parseAiTrack(buffer, origin).map(node => node.position);
 }
 
 function converted(position, origin = [0, 0, 0]) {
@@ -261,7 +279,8 @@ export async function loadLevel(level, manifest, { collisions = true } = {}) {
     path.forEach((p, i) => { if (p.lengthSq() < path[nearest].lengthSq()) nearest = i; });
     path = [...path.slice(nearest), ...path.slice(0, nearest)];
   }
-  return { group, path, aiPath: parseAiPositions(aiBuffer, origin), info, textures, objects, water, stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
+  const aiNodes = parseAiNodes(aiBuffer, origin), aiTrack = makeAiTrack(aiNodes);
+  return { group, path, aiTrack, aiNodes, aiPath: aiTrack.map(node => node.position), info, textures, objects, water, stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
 }
 
 export function disposeLevel(level) {

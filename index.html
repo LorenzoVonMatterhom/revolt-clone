@@ -879,15 +879,17 @@ import * as THREE from "three";
 import { makeRaceRoute } from "./race-ai.js";
 
 // Gates span the driving corridor, rather than requiring a hit on a tiny point.
-export function makeLapGates(points, finishForward, { halfWidth = 120, height = 80 } = {}) {
+export function makeLapGates(points, finishForward, { halfWidth = 120, height = 80, corridor = [], nodes = [] } = {}) {
   if (points.length < 3) return [];
   const route = makeRaceRoute(points);
   const gates = [{ position: new THREE.Vector3(), normal: finishForward.clone().normalize(), halfWidth: Math.min(halfWidth, 120), height: 80 }];
   // The first route node can be on either side of the painted start line.
   // Anchor gate order to the closest forward crossing of the actual finish.
   let phase = 0, closest = Infinity, distanceAlong = 0;
+  const offsets = [];
   const length = route.getLength();
   for (let i = 0; i < points.length; i++) {
+    offsets.push(distanceAlong);
     const a = points[i], b = points[(i + 1) % points.length];
     const segmentLength = a.distanceTo(b);
     const from = a.dot(finishForward), to = b.dot(finishForward);
@@ -901,8 +903,69 @@ export function makeLapGates(points, finishForward, { halfWidth = 120, height = 
     }
     distanceAlong += segmentLength;
   }
+  // FAN boundaries describe the whole legal corridor. Sampling an arbitrary
+  // point on the racing line can put a narrow gate across the inside of a turn.
+  // Use authored cross-sections instead, keeping checkpoint order unchanged.
+  const authored = corridor.length === points.length;
+  let eligible = corridor.map((_, i) => i);
+  if (authored) {
+    if (nodes.length) {
+      const start = nodes.indexOf(corridor[0]);
+      eligible = eligible.filter(index => {
+        const blocked = nodes.indexOf(corridor[index]);
+        if (blocked === start) return false;
+        const seen = new Set([blocked]), pending = [...nodes[start].next];
+        while (pending.length) {
+          const next = pending.pop();
+          if (next === start) return false; // A legal branch bypasses this node.
+          if (!nodes[next] || seen.has(next)) continue;
+          seen.add(next); pending.push(...nodes[next].next);
+        }
+        return true;
+      });
+    }
+    // Wide/angled finish corridors can cross the finish plane on different
+    // adjacent FAN segments. Include their boundary intersections, not just
+    // the segment crossed by the preferred AI line.
+    const side = new THREE.Vector3(-finishForward.z, 0, finishForward.x).normalize();
+    const edges = [];
+    const sections = nodes.length
+      ? nodes.flatMap(a => a.next.filter(index => nodes[index]).map(index => [a, nodes[index]]))
+      : corridor.map((a, j) => [a, corridor[(j + 1) % corridor.length]]);
+    for (const [a, b] of sections) {
+      if (Math.min(a.position.length(), b.position.length()) > Math.max(250, closest + 150)) continue;
+      for (const key of ["left", "right"]) {
+        const from = a[key].dot(finishForward), to = b[key].dot(finishForward);
+        if (from > 0 || to < 0 || Math.abs(to - from) < 0.000001) continue;
+        const at = a[key].clone().lerp(b[key], -from / (to - from));
+        if (Math.abs(at.y - gates[0].position.y) < height) edges.push(at);
+      }
+    }
+    if (edges.length >= 2) {
+      const lateral = edges.map(edge => edge.dot(side)), low = Math.min(...lateral), high = Math.max(...lateral);
+      gates[0].position.addScaledVector(side, (low + high) / 2 - gates[0].position.dot(side));
+      gates[0].halfWidth = (high - low) / 2 + 8;
+    }
+  }
   for (let i = 1; i < 8; i++) {
     const t = (phase + i / 8) % 1;
+    if (authored) {
+      const distance = t * length;
+      let index = 0, best = Infinity;
+      for (const j of eligible) {
+        const difference = Math.abs(offsets[j] - distance);
+        const error = Math.min(difference, length - difference);
+        if (error < best) { best = error; index = j; }
+      }
+      const node = corridor[index];
+      const across = node.right.clone().sub(node.left);
+      const normal = new THREE.Vector3(-across.z, 0, across.x).normalize();
+      const direction = points[(index + 1) % points.length].clone().sub(points[(index - 1 + points.length) % points.length]);
+      if (normal.dot(direction) < 0) normal.negate();
+      gates.push({ position: node.left.clone().add(node.right).multiplyScalar(0.5), normal,
+        halfWidth: Math.hypot(across.x, across.z) / 2 + 8, height: height + Math.abs(across.y) / 2 });
+      continue;
+    }
     const normal = route.getPoint((t + 0.0001) % 1).sub(route.getPoint((t - 0.0001 + 1) % 1));
     if (normal.lengthSq() < 0.000001) normal.copy(route.getTangentAt(t));
     normal.y = 0;
@@ -1339,7 +1402,7 @@ async function buildLevel(level) {
       tangents = Array.from({ length: samples }, (_, i) => curve.getTangentAt(i / samples).normalize());
       normals = tangents.map((t) => new THREE.Vector3(-t.z, 0, t.x).normalize());
       const heading = (loaded.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
-      checkpoints = makeLapGates(loaded.aiRoute, new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading)));
+      checkpoints = makeLapGates(loaded.aiRoute, new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading)), { corridor: loaded.aiTrack, nodes: loaded.aiNodes });
     } else {
       centerline = [];
       tangents = [];
@@ -3330,7 +3393,7 @@ export function parseInfo(text) {
   return info;
 }
 
-export function parseAiPositions(buffer, origin = [0, 0, 0]) {
+export function parseAiNodes(buffer, origin = [0, 0, 0]) {
   if (buffer.byteLength <= 4) return [];
   const view = new DataView(buffer), count = view.getInt16(0, true);
   if (count <= 0 || buffer.byteLength !== 12 + count * 76) throw new Error("Invalid stock Re-Volt FAN file");
@@ -3339,17 +3402,35 @@ export function parseAiPositions(buffer, origin = [0, 0, 0]) {
     const readVector = (at) => [0, 1, 2].map((axis) => view.getFloat32(at + axis * 4, true));
     const left = new THREE.Vector3(...converted(readVector(offset + 40), origin));
     const right = new THREE.Vector3(...converted(readVector(offset + 56), origin));
-    return { position: left.lerp(right, THREE.MathUtils.clamp(view.getFloat32(offset + 4, true), 0, 1)), next: [view.getInt32(offset + 28, true), view.getInt32(offset + 32, true)] };
+    return { left, right, position: left.clone().lerp(right, THREE.MathUtils.clamp(view.getFloat32(offset + 4, true), 0, 1)), next: [view.getInt32(offset + 28, true), view.getInt32(offset + 32, true)] };
   });
+  return nodes;
+}
+
+export function makeAiTrack(nodes) {
+  if (!nodes.length) return [];
   let start = 0;
   nodes.forEach((node, i) => { if (node.position.lengthSq() < nodes[start].position.lengthSq()) start = i; });
-  const path = [], seen = new Set();
-  let index = start;
-  while (nodes[index] && !seen.has(index)) {
-    seen.add(index); path.push(nodes[index].position);
-    index = nodes[index].next.find((next) => next >= 0 && next < count);
+  // A first-choice branch may loop back into itself before reaching the start.
+  // Follow an actual closed circuit through the start, trying alternate exits.
+  const path = [], visited = new Set();
+  function visit(index) {
+    if (index === start && path.length > 2) return true;
+    if (!nodes[index] || visited.has(index)) return false;
+    visited.add(index); path.push(nodes[index]);
+    for (const next of nodes[index].next) if (next >= 0 && visit(next)) return true;
+    path.pop();
+    return false;
   }
-  return path;
+  return visit(start) ? path : [];
+}
+
+export function parseAiTrack(buffer, origin = [0, 0, 0]) {
+  return makeAiTrack(parseAiNodes(buffer, origin));
+}
+
+export function parseAiPositions(buffer, origin = [0, 0, 0]) {
+  return parseAiTrack(buffer, origin).map(node => node.position);
 }
 
 function converted(position, origin = [0, 0, 0]) {
@@ -3479,7 +3560,8 @@ export async function loadLevel(level, manifest, { collisions = true } = {}) {
     path.forEach((p, i) => { if (p.lengthSq() < path[nearest].lengthSq()) nearest = i; });
     path = [...path.slice(nearest), ...path.slice(0, nearest)];
   }
-  return { group, path, aiPath: parseAiPositions(aiBuffer, origin), info, textures, objects, water, stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
+  const aiNodes = parseAiNodes(aiBuffer, origin), aiTrack = makeAiTrack(aiNodes);
+  return { group, path, aiTrack, aiNodes, aiPath: aiTrack.map(node => node.position), info, textures, objects, water, stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
 }
 
 export function disposeLevel(level) {
@@ -3554,7 +3636,6 @@ export async function loadCar(id, name) {
   });
   return root;
 }
-
 </script>
     <script type="text/plain" data-game-module="showroom.js">
 import * as THREE from "three";
