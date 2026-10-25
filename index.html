@@ -1140,7 +1140,7 @@ import * as THREE from "three";
 import { installAudioLifecycle } from "./audio-lifecycle.js";
 import { LEVELS } from "./levels.js";
 import { loadLevel, loadCar, disposeLevel, RV_SCALE } from "./revolt.js";
-import { initializePhysics, MeshPhysics, keyboardSteering } from "./physics.js";
+import { initializePhysics, MeshPhysics, keyboardSteering, smoothPlayerSteering } from "./physics.js";
 import { CarEngineAudio, engineProfile, setWheelPose, CarResetFade } from "./car-effects.js";
 import { Showroom } from "./showroom.js";
 import { PowerupSystem, POWERUPS } from "./powerups.js";
@@ -1516,7 +1516,7 @@ class CarController {
       }
     }
 
-    this.steer = THREE.MathUtils.lerp(this.steer, steerInput, 1 - Math.exp(-dt * (this.isPlayer ? 12 : 7.5)));
+    this.steer = this.isPlayer ? smoothPlayerSteering(this.steer, steerInput, dt) : THREE.MathUtils.lerp(this.steer, steerInput, 1 - Math.exp(-dt * 7.5));
     const trackData = nearestTrackData(this.position);
     const reversing = brake && speed < 2;
     this.throttle = throttle - (reversing ? brake : 0);
@@ -1998,6 +1998,17 @@ export function keyboardSteering(left, right) {
   return Number(left) - Number(right);
 }
 
+export function smoothPlayerSteering(current, target, dt) {
+  const rate = target === 0 ? 8 : 5;
+  return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-Math.max(0, dt) * rate));
+}
+
+export function playerYawTarget(speed, wheelbase, steering) {
+  if (steering === 0) return 0;
+  const limit = 2.8 * Math.abs(steering);
+  return THREE.MathUtils.clamp(speed / wheelbase * Math.tan(steering * 0.65), -limit, limit);
+}
+
 export function initializePhysics() {
   return initialization ??= RAPIER.init();
 }
@@ -2304,7 +2315,7 @@ export class MeshPhysics {
     if (steeringGain > 1 && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
       const wheels = car.setup.wheels;
       const wheelbase = Math.max(4, Math.max(...wheels.map(w => w.position.z)) - Math.min(...wheels.map(w => w.position.z)));
-      const yawTarget = THREE.MathUtils.clamp(speed / wheelbase * Math.tan(steering * 0.65), -2.8, 2.8) * speedSteering;
+      const yawTarget = playerYawTarget(speed, wheelbase, steering) * speedSteering;
       const spin = car.body.angvel();
       car.body.setAngvel({ x: spin.x, y: THREE.MathUtils.lerp(spin.y, yawTarget, 1 - Math.exp(-40 * dt)), z: spin.z }, true);
       const side = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
