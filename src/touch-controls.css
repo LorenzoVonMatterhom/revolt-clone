@@ -46,7 +46,7 @@
     right: 12px; bottom: auto; width: 88px; height: 88px;
   }
   .start { overflow-y: auto; pointer-events: auto; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-  .start-panel { margin: auto 0; }
+  .start-panel { margin: auto 0 0; }
 }
 @media (any-pointer: coarse) and (max-height: 500px), (max-width: 1024px) and (max-height: 500px) {
   .start { align-items: flex-start; padding-top: 8px; }
