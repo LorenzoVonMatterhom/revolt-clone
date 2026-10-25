@@ -58,3 +58,12 @@
   .minimap { width: 64px; height: 64px; }
   .debug-panel { top: 108px; max-height: calc(100dvh - 120px); width: 190px; }
 }
+
+@media (any-pointer: coarse), (max-width: 1024px) {
+  .race-cues { top: calc(max(8px, env(safe-area-inset-top)) + 105px); }
+  .race-cues[data-kind="countdown"] { z-index: 9; }
+  .race-cues[data-kind="turn"] canvas { width: 160px; }
+  .powerup-slot { width: min(132px, calc(50vw - 64px)); gap: 3px; }
+  .powerup-slot strong { font-size: 11px; }
+  .powerup-slot span { font-size: 10px; }
+}

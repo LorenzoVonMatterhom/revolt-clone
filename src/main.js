@@ -12,6 +12,8 @@ import { Showroom } from "./showroom.js";
 import { PowerupSystem, POWERUPS } from "./powerups.js";
 import { RaceAI, makeRaceRoute, makeAiRoute, findAiRecovery } from "./race-ai.js";
 import { makeLapGates, LapProgress } from "./lap-progress.js";
+import { RaceCountdown, RaceCues } from "./race-cues.js";
+import { TurnGuide } from "./track-directions.js";
 import { SkidMarks, isSkidding } from "./skid-marks.js";
 
 const canvas = document.querySelector("#scene");
@@ -48,6 +50,9 @@ let powerAssets;
 let skidMarks;
 let resetFade;
 let showroom;
+let raceCues;
+const raceCountdown = new RaceCountdown(playRaceCue);
+const turnGuide = new TurnGuide([], () => playRaceCue("turn"));
 let selectedCarId = "rc";
 let playerCarId = "rc";
 
@@ -59,7 +64,7 @@ const clock = new THREE.Clock();
 
 const keys = new Map();
 let raceStarted = false;
-const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading, onFire: () => powerups.fire(player, racers), onFlip: flipPlayer });
+const touchControls = createTouchControls({ enabled: () => raceStarted && !levelLoading, onFire: () => { if (!raceCountdown.locked) powerups.fire(player, racers); }, onFlip: flipPlayer });
 let cameraMode = 0;
 let muted = false;
 let elapsedRace = 0;
@@ -106,6 +111,8 @@ const sounds = {
   ambience: new THREE.Audio(listener),
   carSwitch: new THREE.Audio(listener),
   splash: new THREE.Audio(listener),
+  countdown: new THREE.Audio(listener),
+  turn: new THREE.Audio(listener),
 };
 
 function loadSound(name, url, volume, loop = false) {
@@ -123,6 +130,21 @@ loadSound("scrape", "/wavs/scrape.wav", 0.2, true);
 loadSound("turbo", "/wavs/turbo.wav", 0.18);
 loadSound("carSwitch", "/wavs/menuleftright.wav", 0.4);
 loadSound("splash", "/wavs/splash.wav", 0.35);
+
+const raceCueSounds = Promise.all([
+  audioLoader.loadAsync(assetUrl('/wavs/countdown.wav')).then(buffer => sounds.countdown.setBuffer(buffer).setVolume(.42)),
+  audioLoader.loadAsync(assetUrl('/wavs/menuupdown.wav')).then(buffer => sounds.turn.setBuffer(buffer).setVolume(.2)),
+]).catch(error => console.warn('Race cue audio:', error));
+function playRaceCue(stage) {
+  const sound = stage === 'turn' ? sounds.turn : sounds.countdown;
+  if (muted || document.hidden || !document.hasFocus() || !sound.buffer) return;
+  if (sound.isPlaying) sound.stop();
+  if (stage !== 'turn') {
+    sound.duration = stage === 'GO!' ? undefined : .6;
+    sound.setPlaybackRate(stage === 'GO!' ? 1.45 : 1);
+  }
+  sound.play();
+}
 
 let carSwitchGeneration = 0;
 function playCarSwitchSound() {
@@ -189,6 +211,7 @@ async function buildLevel(level) {
     skidMarks?.dispose();
     if (loadedLevel) { scene.remove(loadedLevel.group); disposeLevel(loadedLevel); }
     loadedLevel = loaded;
+    turnGuide.reset(loaded.directions);
     loaded.aiRoute = makeAiRoute(loaded.path, loaded.aiPath);
     currentLevel = level;
     scene.add(loaded.group);
@@ -448,6 +471,7 @@ class CarController {
 }
 
 await initializePhysics();
+[raceCues] = await Promise.all([RaceCues.create(renderer), raceCueSounds]);
 powerAssets = await PowerupSystem.loadAssets();
 for (const name of new Set([...POWERUPS.map((p) => p.sound), "pickup", "firebang", "puttbang", "wbombhit"])) {
   const sound = new THREE.Audio(listener);
@@ -479,7 +503,7 @@ function debugGivePowerup() {
 debugPowerup.addEventListener("change", debugGivePowerup);
 document.querySelector("#debugGive").addEventListener("click", debugGivePowerup);
 document.querySelector("#debugUse").addEventListener("click", () => {
-  if (raceStarted && !levelLoading) powerups.fire(player, racers);
+  if (raceStarted && !raceCountdown.locked && !levelLoading) powerups.fire(player, racers);
 });
 document.querySelector("#debugClear").addEventListener("click", () => {
   if (raceStarted && !levelLoading) { powerups.debugClear(player); updateHud(); }
@@ -551,6 +575,9 @@ canvas.addEventListener("pointerup", event => {
 canvas.addEventListener("pointercancel", () => { showroomDrag = null; });
 function openMenu() {
   resetFade?.cancel(); resetBtn.disabled = false;
+  raceCountdown.reset(); raceCues?.hide(); turnGuide.reset();
+  if (sounds.countdown.isPlaying) sounds.countdown.stop();
+  if (sounds.turn.isPlaying) sounds.turn.stop();
   raceStarted = false; keys.clear(); touchControls.clear(); physicsAccumulator = 0;
   startOverlay.classList.remove("hidden");
   document.querySelector("#game").classList.add("menu-open");
@@ -586,7 +613,7 @@ function pressed(code) {
 }
 
 function flipPlayer() {
-  if (!raceStarted || levelLoading || resetFade?.active) return;
+  if (!raceStarted || raceCountdown.locked || levelLoading || resetFade?.active) return;
   if (!physics.flipCar(player.car)) return;
   keys.clear(); touchControls.clear();
   player.steer = 0; player.sliding = false; player.scrapeHold = 0;
@@ -598,7 +625,7 @@ function flipPlayer() {
 }
 
 function resetPlayer() {
-  if (!raceStarted || levelLoading || resetFade?.active) return;
+  if (!raceStarted || raceCountdown.locked || levelLoading || resetFade?.active) return;
   const back = Math.max(0, player.lastTrackIndex - 4);
   const offset = THREE.MathUtils.clamp(nearestTrackData(player.position).lateral, -4, 4);
   resetFade = new CarResetFade(player.mesh);
@@ -664,7 +691,7 @@ function updateHud() {
     if (icon !== lastPowerIcon) { powerups.drawIcon(powerIcon, icon); lastPowerIcon = icon; }
     powerName.textContent = state.rolling > 0 ? "Selecting..." : state.held?.name ?? "No Pick Up";
     powerStatus.textContent = state.disabled > 0 ? `Power cut: ${state.disabled.toFixed(1)} s` : state.boost > 0 ? `Turbo: ${state.boost.toFixed(1)} s` : state.electro > 0 ? `Pulse: ${state.electro.toFixed(1)} s` : state.shots > 0 ? `${state.shots} / ${state.held.shots}` : "";
-    powerBtn.disabled = !state.held || state.rolling > 0 || state.cooldown > 0 || !raceStarted;
+    powerBtn.disabled = !state.held || state.rolling > 0 || state.cooldown > 0 || !raceStarted || raceCountdown.locked;
     touchControls.setFireEnabled(!powerBtn.disabled);
     const debugLabel = `${powerName.textContent}${powerStatus.textContent ? ` - ${powerStatus.textContent}` : ""}`;
     if (debugStatus.textContent !== debugLabel) debugStatus.textContent = debugLabel;
@@ -713,6 +740,7 @@ function drawMinimap() {
 }
 
 function stepRacePhysics() {
+  if (raceCountdown.locked) return;
   for (const racer of racers) racer.update(PHYSICS_STEP);
   physics.step();
   for (const racer of racers) {
@@ -725,17 +753,20 @@ function stepRacePhysics() {
 }
 
 function animate() {
-  const dt = Math.min(clock.getDelta(), 0.033);
+  const frameDt = clock.getDelta();
+  const dt = Math.min(frameDt, 0.033);
   resetFade?.update(dt);
-  resetBtn.disabled = resetFade?.active ?? false;
-  const canFlip = raceStarted && !levelLoading && !resetFade?.active &&
+  const raceDt = raceStarted && !levelLoading
+    ? Math.min(dt, raceCountdown.update(document.hidden || !document.hasFocus() ? 0 : Math.min(frameDt, .25))) : 0;
+  resetBtn.disabled = raceCountdown.locked || (resetFade?.active ?? false);
+  const canFlip = raceStarted && !raceCountdown.locked && !levelLoading && !resetFade?.active &&
     new THREE.Vector3(0, 1, 0).applyQuaternion(player.mesh.quaternion).y <= 0.7;
   flipBtn.disabled = !canFlip;
   touchControls.setFlipEnabled(canFlip);
-  if (raceStarted && !player.finished) elapsedRace += dt;
+  if (raceStarted && !player.finished) elapsedRace += raceDt;
 
   if (raceStarted && !levelLoading) {
-    physicsAccumulator += dt;
+    physicsAccumulator += raceDt;
     while (physicsAccumulator >= PHYSICS_STEP) {
       stepRacePhysics();
       physicsAccumulator -= PHYSICS_STEP;
@@ -754,10 +785,14 @@ function animate() {
   updateCamera(dt);
   updateHud();
   drawMinimap();
+  const direction = raceStarted && !raceCountdown.locked && !player.finished ? turnGuide.update(raceDt, player.position) : null;
+  raceCues.update(raceStarted ? raceCountdown.stage : null, direction);
 
   if (!raceStarted && showroom) showroom.render(renderer, dt, camera.aspect, keys);
   else renderer.render(scene, camera);
   canvas.dataset.view = raceStarted ? "race" : "menu";
+  canvas.dataset.raceReady = String(raceStarted && !raceCountdown.locked);
+  canvas.dataset.countdown = raceStarted ? raceCountdown.stage ?? "" : "";
   canvas.dataset.physics = JSON.stringify({ position: player.position.toArray(), velocity: player.velocity.toArray(), airborne: player.airborne, steer: player.steer, triangleCount: physics.triangleCount });
   canvas.dataset.engines = JSON.stringify(racers.map((racer) => ({ name: racer.name, engineClass: racer.mesh.userData.engineClass, sample: racer.mesh.userData.engine.profile.sample, playing: racer.mesh.userData.engine.audio.isPlaying, pitch: racer.mesh.userData.engine.audio.getPlaybackRate(), volume: racer.mesh.userData.engine.audio.getVolume() })));
   canvas.dataset.powerups = JSON.stringify({ held: player.powerups.held?.id, shots: player.powerups.shots, bomb: player.powerups.bomb, boost: player.powerups.boost, pickups: powerups.pickups.map((p) => ({ position: p.position.toArray(), active: p.active, model: p.mesh.name })), projectiles: powerups.projectiles.length, hazards: powerups.hazards.length });
@@ -779,7 +814,7 @@ window.addEventListener("keydown", (event) => {
   }
   if (event.code === "Escape") { openMenu(); return; }
   if (event.target.matches("select, input, textarea")) return;
-  if (["KeyF", "ControlLeft"].includes(event.code)) { event.preventDefault(); if (!event.repeat) powerups.fire(player, racers); }
+  if (["KeyF", "ControlLeft"].includes(event.code)) { event.preventDefault(); if (!event.repeat && !raceCountdown.locked) powerups.fire(player, racers); }
   keys.set(event.code, true);
   if (event.code === "KeyV") { event.preventDefault(); if (!event.repeat) flipPlayer(); }
   if (event.code === "KeyR") resetPlayer();
@@ -815,6 +850,8 @@ startBtn.addEventListener("click", async () => {
   startBtn.disabled = false;
   keys.clear(); showroomDrag = null;
   raceStarted = true;
+  raceCountdown.start(); turnGuide.reset(loadedLevel.directions);
+  raceCues.update(raceCountdown.stage, null);
   startOverlay.classList.add("hidden");
   document.querySelector("#game").classList.remove("menu-open");
   updateCamera(1);
@@ -830,7 +867,7 @@ cameraBtn.addEventListener("click", () => {
 });
 resetBtn.addEventListener("click", resetPlayer);
 flipBtn.addEventListener("click", flipPlayer);
-powerBtn.addEventListener("click", () => { if (raceStarted && !levelLoading) powerups.fire(player, racers); });
+powerBtn.addEventListener("click", () => { if (raceStarted && !raceCountdown.locked && !levelLoading) powerups.fire(player, racers); });
 nextLevelBtn.addEventListener("click", () => {
   switchLevel(currentLevelIndex + 1);
 });
@@ -842,6 +879,8 @@ muteBtn.addEventListener("click", () => {
   if (muted && sounds.hit.isPlaying) sounds.hit.stop();
   if (muted && sounds.scrape.isPlaying) sounds.scrape.stop();
   if (muted && sounds.carSwitch.isPlaying) sounds.carSwitch.stop();
+  if (muted && sounds.countdown.isPlaying) sounds.countdown.stop();
+  if (muted && sounds.turn.isPlaying) sounds.turn.stop();
   if (muted && sounds.ambience.isPlaying) sounds.ambience.stop();
   if (muted) for (const sound of powerSounds.values()) if (sound.isPlaying) sound.stop();
   if (!muted && raceStarted && sounds.ambience.buffer && !sounds.ambience.isPlaying) sounds.ambience.play();

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { parseDirectionTriggers } from "./track-directions.js";
 import { collisionMesh } from "./collision-mesh.js";
 import { PoolWater } from "./pool-water.js";
 import { FlexibleAntenna } from "./car-effects.js";
@@ -222,7 +223,7 @@ async function fetchBuffer(url) {
 
 export async function loadLevel(level, manifest, { collisions = true } = {}) {
   const base = `/levels/${level.id}/${level.id}`;
-  const [worldBuffer, instanceBuffer, positionsBuffer, infoResponse, objectsBuffer, aiBuffer] = await Promise.all([fetchBuffer(`${base}.w`), fetchBuffer(`${base}.fin`), manifest.includes(`${base}.pan`) ? fetchBuffer(`${base}.pan`) : Promise.resolve(new ArrayBuffer(0)), fetch(gameAssetUrl(`${base}.inf`)), fetchBuffer(`${base}.fob`), fetchBuffer(`${base}.fan`)]);
+  const [worldBuffer, instanceBuffer, positionsBuffer, infoResponse, objectsBuffer, aiBuffer, triggerBuffer] = await Promise.all([fetchBuffer(`${base}.w`), fetchBuffer(`${base}.fin`), manifest.includes(`${base}.pan`) ? fetchBuffer(`${base}.pan`) : Promise.resolve(new ArrayBuffer(0)), fetch(gameAssetUrl(`${base}.inf`)), fetchBuffer(`${base}.fob`), fetchBuffer(`${base}.fan`), manifest.includes(`${base}.tri`) ? fetchBuffer(`${base}.tri`) : Promise.resolve(new ArrayBuffer(0))]);
   const world = parseWorld(worldBuffer), instances = parseInstances(instanceBuffer);
   const info = parseInfo(await infoResponse.text()), origin = info.STARTPOS ?? [0, 0, 0];
   const textures = {};
@@ -280,7 +281,7 @@ export async function loadLevel(level, manifest, { collisions = true } = {}) {
     path = [...path.slice(nearest), ...path.slice(0, nearest)];
   }
   const aiNodes = parseAiNodes(aiBuffer, origin), aiTrack = makeAiTrack(aiNodes);
-  return { group, path, aiTrack, aiNodes, aiPath: aiTrack.map(node => node.position), info, textures, objects, water, stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
+  return { group, path, directions: parseDirectionTriggers(triggerBuffer, origin), aiTrack, aiNodes, aiPath: aiTrack.map(node => node.position), info, textures, objects, water, stats: { meshes: world.meshes.length, polygons: world.meshes.reduce((n, m) => n + m.polygons.length, 0), instances: instances.length, textures: Object.keys(textures).length } };
 }
 
 export function disposeLevel(level) {
