@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { installAudioLifecycle } from "./audio-lifecycle.js";
 import { LEVELS } from "./levels.js";
 import { loadLevel, loadCar, disposeLevel, RV_SCALE } from "./revolt.js";
-import { initializePhysics, MeshPhysics, keyboardSteering } from "./physics.js";
+import { initializePhysics, MeshPhysics, keyboardSteering, smoothPlayerSteering } from "./physics.js";
 import { CarEngineAudio, engineProfile, setWheelPose, CarResetFade } from "./car-effects.js";
 import { Showroom } from "./showroom.js";
 import { PowerupSystem, POWERUPS } from "./powerups.js";
@@ -382,7 +382,7 @@ class CarController {
       }
     }
 
-    this.steer = THREE.MathUtils.lerp(this.steer, steerInput, 1 - Math.exp(-dt * (this.isPlayer ? 12 : 7.5)));
+    this.steer = this.isPlayer ? smoothPlayerSteering(this.steer, steerInput, dt) : THREE.MathUtils.lerp(this.steer, steerInput, 1 - Math.exp(-dt * 7.5));
     const trackData = nearestTrackData(this.position);
     const reversing = brake && speed < 2;
     this.throttle = throttle - (reversing ? brake : 0);

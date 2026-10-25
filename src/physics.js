@@ -7,6 +7,17 @@ export function keyboardSteering(left, right) {
   return Number(left) - Number(right);
 }
 
+export function smoothPlayerSteering(current, target, dt) {
+  const rate = target === 0 ? 8 : 5;
+  return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-Math.max(0, dt) * rate));
+}
+
+export function playerYawTarget(speed, wheelbase, steering) {
+  if (steering === 0) return 0;
+  const limit = 2.8 * Math.abs(steering);
+  return THREE.MathUtils.clamp(speed / wheelbase * Math.tan(steering * 0.65), -limit, limit);
+}
+
 export function initializePhysics() {
   return initialization ??= RAPIER.init();
 }
@@ -313,7 +324,7 @@ export class MeshPhysics {
     if (steeringGain > 1 && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
       const wheels = car.setup.wheels;
       const wheelbase = Math.max(4, Math.max(...wheels.map(w => w.position.z)) - Math.min(...wheels.map(w => w.position.z)));
-      const yawTarget = THREE.MathUtils.clamp(speed / wheelbase * Math.tan(steering * 0.65), -2.8, 2.8) * speedSteering;
+      const yawTarget = playerYawTarget(speed, wheelbase, steering) * speedSteering;
       const spin = car.body.angvel();
       car.body.setAngvel({ x: spin.x, y: THREE.MathUtils.lerp(spin.y, yawTarget, 1 - Math.exp(-40 * dt)), z: spin.z }, true);
       const side = new THREE.Vector3(forward.z, 0, -forward.x).normalize();

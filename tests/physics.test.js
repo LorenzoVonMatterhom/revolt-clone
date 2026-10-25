@@ -4,7 +4,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { readFileSync, readdirSync } from "node:fs";
 import { loadLevel, loadCar, disposeLevel } from "../src/revolt.js";
-import { initializePhysics, meshTriangles, MeshPhysics, keyboardSteering } from "../src/physics.js";
+import { initializePhysics, meshTriangles, MeshPhysics, keyboardSteering, smoothPlayerSteering, playerYawTarget } from "../src/physics.js";
 import { LEVELS } from "../src/levels.js";
 
 await initializePhysics();
@@ -550,4 +550,23 @@ for (const id of ["phat", "candy", "tc5", "tc4", "tc3", "amw", "tc2"]) test(`${i
     physics.updateVehicle(car,1/120,1,0,0,false,1,2.1);
     assert.ok(Math.abs(car.body.angvel().x+2)<.001,`${id}: airborne pitch must remain free`);
   } finally { globalThis.fetch=savedFetch; physics?.dispose(); mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();}); }
+});
+
+test("player steering builds smoothly, recenters faster, and keeps full held steering", () => {
+  const first = smoothPlayerSteering(0,1,1/120);
+  assert.ok(first>0 && first<.05);
+  let steering=0;
+  for(let i=0;i<120;i++)steering=smoothPlayerSteering(steering,1,1/120);
+  assert.ok(steering>.99);
+  assert.ok(smoothPlayerSteering(1,-1,1/120)>.9,"Direction reversal must not snap");
+  assert.ok(smoothPlayerSteering(1,0,.1)<smoothPlayerSteering(0,1,.1)+.1);
+});
+
+test("small steering inputs cannot instantly trigger maximum high-speed turning assistance", () => {
+  for(const speed of [40,90,180,-70]){
+    const full=Math.abs(playerYawTarget(speed,8,1));
+    assert.ok(Math.abs(playerYawTarget(speed,8,.2))<=full*.21);
+    assert.equal(playerYawTarget(speed,8,0),0);
+    assert.ok(Math.abs(playerYawTarget(speed,8,-1)+playerYawTarget(speed,8,1))<1e-6);
+  }
 });
