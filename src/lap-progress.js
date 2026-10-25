@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { makeRaceRoute } from "./race-ai.js";
 
 // Gates span the driving corridor, rather than requiring a hit on a tiny point.
-export function makeLapGates(points, finishForward, { halfWidth = 120, height = 80, corridor = [], nodes = [] } = {}) {
+export function makeLapGates(points, finishForward, { halfWidth = 120, height = 80, corridor = [], nodes = [], includeSidewalks = false } = {}) {
   if (points.length < 3) return [];
   const route = makeRaceRoute(points);
   const gates = [{ position: new THREE.Vector3(), normal: finishForward.clone().normalize(), halfWidth: Math.min(halfWidth, 120), height: 80 }];
@@ -95,6 +95,11 @@ export function makeLapGates(points, finishForward, { halfWidth = 120, height = 
     if (normal.lengthSq() < 0.000001) normal.copy(finishForward);
     gates.push({ position: route.getPoint(t), normal: normal.normalize(), halfWidth, height });
   }
+  // The AI corridor follows the road, not the full drivable pavement. Leave
+  // room for the raised neighborhood sidewalks outside those boundaries at
+  // every gate, including the finish. Keep the same planes, crossing order
+  // and height tests.
+  if (includeSidewalks) for (const gate of gates) gate.halfWidth += 160;
   return gates;
 }
 
