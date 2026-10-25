@@ -97,14 +97,15 @@ test("a new race clears completed laps and uses the new track gates", () => {
 
 for(const definition of LEVELS.filter(level=>level.kind==='race'&&level.id!=='stunts')) {
   test(`${definition.id}: original driving line completes three player laps`, () => {
-    const base=`levels/${definition.id}/${definition.id}`;
+    const id=definition.id;
+    const base=`levels/${id}/${id}`;
     const info=parseInfo(readFileSync(base+'.inf','utf8'));
     const bytes=readFileSync(base+'.fan');
     const nodes=parseAiNodes(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),info.STARTPOS);
     const corridor=makeAiTrack(nodes), path=corridor.map(node=>node.position);
     const heading=info.STARTROT[0]*Math.PI*2;
     const normal=new THREE.Vector3(Math.sin(heading),0,Math.cos(heading));
-    const tracker=new LapProgress(makeLapGates(path,normal,{corridor,nodes}));
+    const tracker=new LapProgress(makeLapGates(path,normal,{corridor,nodes,includeSidewalks:/^nhood[12]$/.test(id)}));
     const curve=makeRaceRoute(path);
     let phase=0,best=Infinity;
     for(let i=1;i<=4000;i++) {
@@ -117,7 +118,7 @@ for(const definition of LEVELS.filter(level=>level.kind==='race'&&level.id!=='st
     for(let lap=1;lap<=3;lap++){travel(tracker,curve,phase+.0001,phase+1.0001);assert.equal(tracker.lap,lap+1,`Failed player lap ${lap}, next gate ${tracker.nextCheckpoint}`);}
     assert.equal(tracker.finished,true);
     for (const lane of [-12, 12]) {
-      const offsetTracker = new LapProgress(makeLapGates(path, normal, {corridor,nodes}));
+      const offsetTracker = new LapProgress(makeLapGates(path, normal, {corridor,nodes,includeSidewalks:/^nhood[12]$/.test(id)}));
       travel(offsetTracker, curve, phase - .01, phase + 1.01, lane);
       assert.equal(offsetTracker.lap, 2, `Driving line offset ${lane} must still count, next gate ${offsetTracker.nextCheckpoint}`);
     }
@@ -143,7 +144,7 @@ for (const {id} of LEVELS.filter(level=>level.kind==='race'&&level.id!=='stunts'
     const bytes=readFileSync(base+'.fan');
     const nodes=parseAiNodes(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),info.STARTPOS);
     const corridor=makeAiTrack(nodes), normal=new THREE.Vector3(Math.sin(info.STARTROT[0]*Math.PI*2),0,Math.cos(info.STARTROT[0]*Math.PI*2));
-    const gates=makeLapGates(corridor.map(node=>node.position),normal,{corridor,nodes});
+    const gates=makeLapGates(corridor.map(node=>node.position),normal,{corridor,nodes,includeSidewalks:/^nhood[12]$/.test(id)});
     for (const alternative of [false,true]) {
       if (alternative) nodes.forEach(node=>node.next.reverse());
       const branch=makeAiTrack(nodes);
@@ -169,3 +170,40 @@ for (const {id} of LEVELS.filter(level=>level.kind==='race'&&level.id!=='stunts'
     }
   });
 }
+
+for (const id of ['nhood1','nhood2']) test(`${id}: raised sidewalk crossings beyond the AI road edges count`, async () => {
+  const {loadLevel,disposeLevel}=await import('../src/revolt.js');
+  const {initializePhysics,MeshPhysics}=await import('../src/physics.js');
+  const {readdirSync}=await import('node:fs');
+  await initializePhysics();
+  const savedFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  let level,physics;
+  try {
+    const manifest=readdirSync('levels',{recursive:true}).map(path=>'/levels/'+path);
+    level=await loadLevel({id},manifest);physics=new MeshPhysics(level.group);
+    const heading=level.info.STARTROT[0]*Math.PI*2, normal=new THREE.Vector3(Math.sin(heading),0,Math.cos(heading));
+    const options={corridor:level.aiTrack,nodes:level.aiNodes};
+    const road=makeLapGates(level.aiPath,normal,options);
+    const expanded=makeLapGates(level.aiPath,normal,{...options,includeSidewalks:true});
+    let pavementCrossings=0,finishCrossings=0;
+    for(let i=0;i<road.length;i++) for(const sign of [-1,1]) for(const beyond of [40,60,80,100,120,140]) {
+      const gate=road[i],side=new THREE.Vector3(-gate.normal.z,0,gate.normal.x);
+      const at=gate.position.clone().addScaledVector(side,sign*(gate.halfWidth+beyond));
+      const floor=physics.groundAt(at,20,40);
+      if(floor===null||floor-gate.position.y<2||floor-gate.position.y>20)continue;
+      at.y=floor+2;
+      const before=at.clone().addScaledVector(gate.normal,-3),after=at.clone().addScaledVector(gate.normal,3);
+      const oldTracker=new LapProgress(road),tracker=new LapProgress(expanded);
+      for(const t of [oldTracker,tracker]) {t.nextCheckpoint=i;t.relocate(before);t.update(after);}
+      assert.equal(oldTracker.nextCheckpoint,i,'Reproduce the missed pavement crossing');
+      assert.notEqual(tracker.nextCheckpoint,i,`Pavement ${beyond} beyond gate ${i}, side ${sign}, must count`);
+      if(i===0){assert.equal(tracker.lap,2);finishCrossings++;}
+      pavementCrossings++;
+    }
+    assert.ok(pavementCrossings>=8,`Checked ${pavementCrossings} raised-pavement crossings`);
+    assert.ok(finishCrossings>0,'The finish must also count on the sidewalk');
+  } finally {
+    physics?.dispose();if(level)disposeLevel(level);globalThis.fetch=savedFetch;
+  }
+});
