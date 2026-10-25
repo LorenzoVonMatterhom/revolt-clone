@@ -336,3 +336,9 @@ select:focus-visible {
 .debug-panel.is-collapsed > :not(h2) { display: none; }
 .debug-panel select { min-height: 40px; }
 .debug-panel { z-index: 8; }
+
+/* Stock Re-Volt direction sprites and countdown models, above the track. */
+.race-cues { top: 18px; left: 50%; transform: translateX(-50%); z-index: 7; filter: drop-shadow(0 3px 3px #000a); }
+.race-cues[hidden] { display: none; }
+.race-cues canvas { display: block; width: clamp(200px, 30vw, 400px); height: auto; }
+.race-cues[data-kind="turn"] canvas { width: 180px; }

@@ -107,7 +107,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await page.locator("#menuTrack").selectOption("ship1");
     await page.waitForFunction(() => window.revoltMap?.id === "ship1" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
     await page.locator("#startBtn").tap();
-    await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race" && document.querySelector("#scene").dataset.raceReady === "true", undefined, { timeout: 30000 });
     console.log(name, "mobile Cougar race started");
     if (!await page.locator('.touch-controls button[data-code="KeyW"]').isVisible()) throw new Error("Gas button is hidden");
     console.log(name, "touch gas button visible");
@@ -178,7 +178,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
     await page.locator("#menuTrack").selectOption("ship2");
     await page.waitForFunction(() => window.revoltMap?.id === "ship2" && !document.querySelector("#startBtn").disabled, undefined, { timeout: 60000 });
     await page.locator("#startBtn").tap();
-    await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race", undefined, { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race" && document.querySelector("#scene").dataset.raceReady === "true", undefined, { timeout: 30000 });
     console.log(name, "Both Toytanic races loaded with pool water");
     await page.locator("#debugToggle").evaluate(button => button.click());
     if (await page.locator("#debugPowerup").isVisible()) throw new Error("Debug panel did not hide");
@@ -193,7 +193,7 @@ for (const [name, engine] of [["Chrome", chromium], ["Safari", webkit]]) {
       await page.locator("#menuTrack").selectOption(track);
       await page.waitForFunction(id => window.revoltMap?.id === id && !document.querySelector("#startBtn").disabled, track, { timeout: 60000 });
       await page.locator("#startBtn").tap();
-      await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race");
+      await page.waitForFunction(() => document.querySelector("#scene")?.dataset.view === "race" && document.querySelector("#scene").dataset.raceReady === "true");
       const secondLap = await page.evaluate(() => window.__lapTest.drive(0, 1));
       if (secondLap.hud !== "2/3") throw new Error(`${track}: first lap did not update HUD: ${JSON.stringify(secondLap)}`);
       const beforeReset = await page.evaluate(() => window.__lapTest.drive(0, 0.55));
