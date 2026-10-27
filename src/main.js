@@ -14,6 +14,7 @@ import { RaceAI, makeRaceRoute, makeAiRoute, findAiRecovery } from "./race-ai.js
 import { makeLapGates, LapProgress } from "./lap-progress.js";
 import { RaceCountdown, RaceCues } from "./race-cues.js";
 import { TurnGuide } from "./track-directions.js";
+import { OPPONENTS, placeStartingGrid } from "./race-grid.js";
 import { SkidMarks, isSkidding } from "./skid-marks.js";
 
 const canvas = document.querySelector("#scene");
@@ -326,25 +327,29 @@ class CarController {
     this.lastTrackIndex = 0;
     this.placeScore = 0;
     this.lapTracker = new LapProgress(checkpoints, TOTAL_LAPS);
-    this.resetTo(0, options.startOffset || 0, (samples - (options.startIndex || samples)) / 6);
+    this.ensurePhysics();
   }
 
-  resetTo(index, offset = 0, gridRow = 0) {
+  ensurePhysics() {
+    if (this.physics !== physics) {
+      this.physics = physics;
+      this.car = physics.createCar(this.mesh, { autoRighting: !this.isPlayer });
+    }
+  }
+
+  resetTo(index, offset = 0) {
     if (this.isPlayer) {
       this.scrapeHold = 0;
       if (sounds.scrape.isPlaying) sounds.scrape.stop();
     }
     skidMarks?.previous.delete(this);
     this.sliding = false;
-    if (this.physics !== physics) {
-      this.physics = physics;
-      this.car = physics.createCar(this.mesh, { autoRighting: !this.isPlayer });
-    }
+    this.ensurePhysics();
     const heading = index && tangents[index] ? Math.atan2(tangents[index].x, tangents[index].z) : (loadedLevel.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
     const right = new THREE.Vector3(forward.z, 0, -forward.x);
     const p = index && centerline[index] ? centerline[index].clone() : new THREE.Vector3();
-    p.addScaledVector(right, offset).addScaledVector(forward, -gridRow * 20);
+    p.addScaledVector(right, offset);
     const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
     let placed = physics.placeCar(this.car, p, rotation);
     if (!placed && this.car.safePose) placed = physics.placeCar(this.car, this.car.safePose.position, this.car.safePose.rotation);
@@ -354,16 +359,20 @@ class CarController {
     this.lapTracker?.relocate(this.position);
   }
 
-  restart(index, offset = 0) {
+  prepareRace() {
+    this.ensurePhysics();
     this.ai = new RaceAI(loadedLevel.aiRoute, this.aiSpeed, this.mesh.userData.physics);
-    this.resetTo(0, offset, (samples - (index || samples)) / 6);
-    this.lapTracker?.reset(checkpoints, this.position);
     this.lap = 1;
     this.finished = false;
     this.nextCheckpoint = 1;
     this.progress = 0;
     this.placeScore = 0;
     this.bumpCooldown = 0;
+    this.steer = 0; this.throttle = 0; this.sliding = false; this.scrapeHold = 0;
+    this.car.setup.wheels.forEach((_,i)=>{
+      this.car.vehicle.setWheelSteering(i,0);this.car.vehicle.setWheelEngineForce(i,0);this.car.vehicle.setWheelBrake(i,0);
+      this.car.wheelColliders[i].setRotationWrtParent(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2));
+    });
   }
 
   update(dt) {
@@ -480,14 +489,26 @@ for (const name of new Set([...POWERUPS.map((p) => p.sound), "pickup", "firebang
 }
 await buildLevel(currentLevel);
 
-const playerMesh = await makeCar("rc", "RC Bandit");
-const racers = [
-  new CarController(playerMesh, { isPlayer: true, startIndex: 0, startOffset: -3.3 }),
-  new CarController(await makeCar("volken", "Volken Turbo"), { startIndex: 354, startOffset: 3.2, aiTargetOffset: 1.2, aiSpeed: 0.92 }),
-  new CarController(await makeCar("phat", "Phat Slug"), { startIndex: 348, startOffset: -1.4, aiTargetOffset: -2.2, aiSpeed: 0.88 }),
-  new CarController(await makeCar("cougar", "Cougar"), { startIndex: 342, startOffset: 3.8, aiTargetOffset: 2.8, aiSpeed: 0.96 }),
-];
+const meshes = await Promise.all([
+  makeCar("rc", "RC Bandit"),
+  ...OPPONENTS.map(opponent=>makeCar(opponent.id,opponent.name)),
+]);
+const racers = meshes.map((mesh,index)=>new CarController(mesh,index===0
+  ? {isPlayer:true} : {aiSpeed:OPPONENTS[index-1].pace}));
 let player = racers[0];
+
+function restartRaceGrid() {
+  racers.forEach(racer=>racer.prepareRace());
+  const heading=(loadedLevel.info.STARTROT?.[0]??0)*Math.PI*2;
+  const slots=placeStartingGrid(physics,racers.map(racer=>racer.car),heading);
+  racers.forEach((racer,index)=>{
+    racer.gridSlot=slots[index];racer.syncPhysics();
+    racer.lapTracker.reset(checkpoints,racer.position);
+    racer.placeScore=racer.lapTracker.score(racer.position);
+    racer.lastTrackIndex=nearestTrackData(racer.position).index;
+  });
+}
+restartRaceGrid();
 powerups.reset(racers);
 
 for (const item of POWERUPS) {
@@ -599,10 +620,7 @@ async function switchLevel(nextIndex) {
   openMenu();
   const built = await buildLevel(currentLevel);
   if (!built) return;
-  racers[0].restart(0, -3.3);
-  racers[1].restart(354, 3.2);
-  racers[2].restart(348, -1.4);
-  racers[3].restart(342, 3.8);
+  restartRaceGrid();
   powerups.reset(racers);
   updateCamera(1);
   updateHud();
@@ -836,12 +854,12 @@ startBtn.addEventListener("click", async () => {
       physics.removeCar(player.car);
       player.mesh.userData.engine.audio.disconnect();
       player.mesh.traverse((o) => { o.geometry?.dispose(); if (o.material) { o.material.map?.dispose(); o.material.dispose(); } });
-      racers[0] = player = new CarController(mesh, { isPlayer: true, startOffset: -3.3 });
+      racers[0] = player = new CarController(mesh, { isPlayer: true });
       playerCarId = choice.id;
     }
     elapsedRace = 0;
     skidMarks.clear();
-    racers.forEach((racer, i) => racer.restart(i ? 360 - i * 6 : 0, [-3.3, 3.2, -1.4, 3.8][i]));
+    restartRaceGrid();
     powerups.reset(racers);
   } catch (error) {
     console.error(error); document.querySelector("#startDescription").textContent = error.message;
