@@ -6,10 +6,11 @@ import { RaceAI, makeRaceRoute, makeAiRoute, findAiRecovery, trafficSpeedLimit }
 import { loadLevel, loadCar, disposeLevel } from "../src/revolt.js";
 import { initializePhysics, MeshPhysics } from "../src/physics.js";
 import { LEVELS } from "../src/levels.js";
+import { OPPONENTS } from "../src/race-grid.js";
 
 test("AI targets nearby route distances and slows before the first neighborhood corner", () => {
   const ai = new RaceAI([new THREE.Vector3(0,0,0), new THREE.Vector3(500,0,0), new THREE.Vector3(500,0,-500), new THREE.Vector3(0,0,-500)]);
-  const controls = ai.update(1/60, new THREE.Vector3(400,0,0), Math.PI/2, new THREE.Vector3(60,0,0));
+  const controls = ai.update(1/60, new THREE.Vector3(400,0,0), Math.PI/2, new THREE.Vector3(100,0,0));
   assert.ok(Math.abs(controls.steering) < 0.01, "Must not steer diagonally toward a distant segment");
   assert.ok(controls.brake > 0, "Must slow before a sharp turn");
 });
@@ -29,9 +30,10 @@ test("opponents accelerate at full throttle and cruise faster on long straights"
 test("corner braking ramps up near the turn rather than crawling throughout the approach", () => {
   const points=[new THREE.Vector3(),new THREE.Vector3(1000,0,0),new THREE.Vector3(1000,0,1000),new THREE.Vector3(0,0,1000)];
   const far=new RaceAI(points),near=new RaceAI(points);
-  const approach=far.update(1/60,new THREE.Vector3(800,0,0),Math.PI/2,new THREE.Vector3(55,0,0));
-  const corner=near.update(1/60,new THREE.Vector3(980,0,0),Math.PI/2,new THREE.Vector3(55,0,0));
-  assert.ok(approach.throttle>0.5);
+  const approach=far.update(1/60,new THREE.Vector3(800,0,0),Math.PI/2,new THREE.Vector3(80,0,0));
+  const corner=near.update(1/60,new THREE.Vector3(980,0,0),Math.PI/2,new THREE.Vector3(80,0,0));
+  assert.equal(approach.throttle,1,"An opponent must keep full power 200 units before the turn at race speed");
+  assert.equal(approach.brake,0);
   assert.ok(corner.brake>approach.brake);
 });
 
@@ -100,6 +102,36 @@ test("an original opponent reaches a bounded cruising speed on a straight", asyn
     globalThis.fetch=originalFetch;physics?.dispose();mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
   }
 });
+
+for (const {id, pace} of OPPONENTS) test(`${id} AI matches the player's straight-line acceleration and speed`, async t => {
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  const results=[];
+  try {
+    for (const isPlayer of [true,false]) {
+      const ground=new THREE.Group();
+      const floor=new THREE.Mesh(new THREE.BoxGeometry(500,1,10000));floor.position.y=-0.5;ground.add(floor);
+      const physics=new MeshPhysics(ground),mesh=await loadCar(id,id),car=physics.createCar(mesh);
+      try {
+        assert.ok(physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion()));
+        const ai=new RaceAI([new THREE.Vector3(),new THREE.Vector3(0,0,9000),new THREE.Vector3(1000,0,9000),new THREE.Vector3(1000,0,0)],pace,car.setup);
+        for(let frame=0;frame<1440;frame++) {
+          const forward=new THREE.Vector3(0,0,1).applyQuaternion(car.body.rotation());
+          const controls=isPlayer?{throttle:1,brake:0,steering:0}:ai.update(1/120,new THREE.Vector3().copy(car.body.translation()),Math.atan2(forward.x,forward.z),new THREE.Vector3().copy(car.body.linvel()));
+          physics.updateVehicle(car,1/120,controls.throttle,controls.brake,controls.steering,false,1,isPlayer?2.1:1);physics.step();
+        }
+        results.push({speed:car.body.linvel().z,distance:car.body.translation().z});
+      } finally {
+        physics.dispose();mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});floor.geometry.dispose();floor.material.dispose();
+      }
+    }
+    const [player,ai]=results;
+    assert.ok(ai.speed>player.speed*.94,`AI ${ai.speed} vs player ${player.speed}`);
+    assert.ok(ai.distance>player.distance*.94,`AI ${ai.distance} vs player ${player.distance}`);
+    t.diagnostic(`AI/player speed: ${ai.speed.toFixed(1)}/${player.speed.toFixed(1)}, distance: ${ai.distance.toFixed(1)}/${player.distance.toFixed(1)}`);
+  } finally {globalThis.fetch=originalFetch;}
+});
+
 for (const {id} of LEVELS.filter(level=>level.kind==="race"&&level.id!=="stunts")) test(`opponent completes a full ${id} lap on original collision meshes`, async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => new Response(readFileSync(String(url).slice(1)));

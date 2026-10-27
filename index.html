@@ -2685,8 +2685,8 @@ export class MeshPhysics {
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
     car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, TERRAIN_GROUPS, collider => collider.handle === this.terrain?.handle);
-    // At full throttle the tire solver saturates lateral grip, despite full
-    // visible steering lock. Support the player's grounded turn at the chassis.
+    // At full throttle the tire solver saturates lateral grip. Give both the
+    // player and opponents grounded guidance without adding drive power.
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(car.body.rotation()).y;
     const contacts = car.setup.wheels.filter((_, i) => car.vehicle.wheelIsInContact(i)).length;
     // Rear-driven launches can pivot the light chassis onto its rear axle.
@@ -2705,7 +2705,7 @@ export class MeshPhysics {
         car.body.setAngvel(spin, true);
       }
     }
-    if (steeringGain > 1 && car.driveIntent && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
+    if (car.driveIntent && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > (steeringGain > 1 ? 0.05 : 0.005)) {
       const wheels = car.setup.wheels;
       const wheelbase = Math.max(4, Math.max(...wheels.map(w => w.position.z)) - Math.min(...wheels.map(w => w.position.z)));
       // Match the actual tire angle at launch; a shallower assisted turn makes
@@ -2715,7 +2715,11 @@ export class MeshPhysics {
         if (wheel.turnable ?? wheel.position.z > 0) { wheelAngle += car.vehicle.wheelSteering(i) ?? 0; turningWheels++; }
       });
       wheelAngle /= Math.max(1,turningWheels);
-      const yawTarget = playerYawTarget(speed, wheelbase, steering, wheelAngle / speedSteering) * speedSteering;
+      // Human input keeps its gradual yaw cap. AI supplies a calibrated wheel
+      // angle; shrinking that cap by its small input would understeer every bend.
+      const yawTarget = steeringGain > 1
+        ? playerYawTarget(speed, wheelbase, steering, wheelAngle / speedSteering) * speedSteering
+        : THREE.MathUtils.clamp(speed / wheelbase * Math.tan(wheelAngle), -2.8, 2.8);
       const spin = car.body.angvel();
       car.body.setAngvel({ x: spin.x, y: THREE.MathUtils.lerp(spin.y, yawTarget, 1 - Math.exp(-40 * dt)), z: spin.z }, true);
       const side = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
@@ -3267,6 +3271,11 @@ export class PowerupSystem {
     <script type="text/plain" data-game-module="race-ai.js">
 import * as THREE from "three";
 
+// Conservative relative to measured full-brake deceleration on stock cars.
+// The old 14-unit estimate made opponents coast hundreds of units too soon.
+const AI_BRAKING_DECELERATION = 30;
+const AI_CORNER_ACCELERATION = 70;
+
 export function makeRaceRoute(points) {
   const curve = new THREE.CurvePath();
   for (let i = 0; i < points.length; i++) curve.add(new THREE.LineCurve3(points[i], points[(i + 1) % points.length]));
@@ -3398,7 +3407,7 @@ export class RaceAI {
       return { throttle: -0.3, brake: 0, steering: -steering };
     }
     let desiredSpeed = 185 * this.pace;
-    const stoppingDistance = speed * speed / 28 + 25;
+    const stoppingDistance = speed * speed / (2 * AI_BRAKING_DECELERATION) + 25;
     // Brake before sharp authored corners, instead of aiming through nearby walls.
     for (let i = 0; i < this.points.length; i++) {
       const corner = (segment + i + 1) % this.points.length;
@@ -3411,20 +3420,20 @@ export class RaceAI {
       if (turn > 0.3) {
         const segmentLength=Math.min(this.lengths[(corner-1+this.points.length)%this.points.length],this.lengths[corner]);
         const radius=Math.max(5,segmentLength*0.7/(2*Math.sin(turn/2)));
-        const turnLimit=32+118*Math.max(0,1-turn/(Math.PI/2));
-        const cornerSpeed=Math.min(THREE.MathUtils.clamp(Math.sqrt(radius*45),28,150),turnLimit);
-        const approachSpeed = Math.sqrt(cornerSpeed * cornerSpeed + 28 * Math.max(0, distance - 15));
+        // Match corner pace to the doubled race speed while keeping hairpins slower.
+        const turnLimit=55+95*Math.max(0,1-turn/(Math.PI/2));
+        const cornerSpeed=Math.min(THREE.MathUtils.clamp(Math.sqrt(radius*AI_CORNER_ACCELERATION),38,150),turnLimit);
+        const approachSpeed = Math.sqrt(cornerSpeed * cornerSpeed + 2 * AI_BRAKING_DECELERATION * Math.max(0, distance - 15));
         desiredSpeed = Math.min(desiredSpeed, approachSpeed);
       }
     }
-    if (Math.abs(angle) > 0.65 || routeError > 12) desiredSpeed = Math.min(desiredSpeed, 35);
+    if (Math.abs(angle) > 0.65 || routeError > 12) desiredSpeed = Math.min(desiredSpeed, 50);
     desiredSpeed=Math.min(desiredSpeed,trafficLimit);
     if(trafficLimit===0) return {throttle:0,brake:1,steering};
     return { throttle: THREE.MathUtils.clamp(0.15 + (desiredSpeed - speed) * 0.04, 0, 1), brake: THREE.MathUtils.clamp((speed - desiredSpeed) / 15, 0, 1), steering };
   }
 }
-
-    </script>
+</script>
     <script type="text/plain" data-game-module="pool-water.js">
 import * as THREE from "three";
 
