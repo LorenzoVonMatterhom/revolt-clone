@@ -1,9 +1,11 @@
 import test from "node:test";
+import * as THREE from "three";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { STOCK_CARS, carDetails, Showroom, CAR_DISPLAY, boxShelfPose } from "../src/showroom.js";
+import { STOCK_CARS, carDetails, Showroom } from "../src/showroom.js";
+import { ORIGINAL_BOX_CARS, originalBoxPlacements, originalBoxArtwork, originalBoxModel } from "../src/car-boxes.js";
 import { LEVELS, FRONTEND } from "../src/levels.js";
-import { parsePrm, parseWorld, loadCar, loadLevel, disposeLevel, decodeBitmap, makeMeshes } from "../src/revolt.js";
+import { parsePrm, parseObjects, parseInfo, loadCar, loadLevel, disposeLevel, decodeBitmap, makeMeshes } from "../src/revolt.js";
 
 test("showroom geometry loads without downloading race collision files", async () => {
   const originalFetch = globalThis.fetch;
@@ -27,32 +29,45 @@ test("frontend is a menu asset, not a playable track", () => {
   assert.ok(!LEVELS.some((level) => level.id === "frontend"));
 });
 
-test("showroom boxes use the untouched original model and BMP textures without rendering car previews", async () => {
-  const originalFetch=globalThis.fetch, requests=[];
+test("all boxes use their original stock artwork and package geometry without car-preview renders", async () => {
+  const originalFetch=globalThis.fetch,requests=[];
   globalThis.fetch=async url=>{requests.push(String(url));return new Response(readFileSync(String(url).slice(1)));};
   const buffer=path=>{const b=readFileSync(path);return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);};
+  let showroom;
   try {
-    const model=parsePrm(buffer("levels/frontend/carbox.m"));
+    const source=parsePrm(buffer("levels/frontend/carbox.m"));
+    const placements=originalBoxPlacements(parseObjects(buffer("levels/frontend/frontend.fob"),parseInfo(readFileSync("levels/frontend/frontend.inf","utf8")).STARTPOS));
     const textures={3:decodeBitmap(buffer("levels/frontend/frontendd.bmp")),4:decodeBitmap(buffer("levels/frontend/frontende.bmp"))};
-    const expected=makeMeshes([model],textures,[0,0,0]);
+    const art=new Map([1,2,3,5].map(page=>[page,decodeBitmap(buffer(`cars/misc/carbox${page}.bmp`))]));
     const manifest=readdirSync("levels",{recursive:true}).map(p=>"/levels/"+p.replaceAll("\\","/"));
-    // No renderer is needed: original package artwork is used directly.
-    const showroom=await Showroom.create(null,manifest);
+    showroom=await Showroom.create(null,manifest);
     assert.equal(showroom.boxes.length,28);
     for(const box of showroom.boxes) {
+      const id=box.userData.carId,model=originalBoxModel(source,id),{page}=originalBoxArtwork(id);
+      const placement=placements.get(id);
+      assert.deepEqual(box.userData.home,placement.position);assert.deepEqual(box.position,placement.position);
+      assert.ok(box.quaternion.angleTo(placement.quaternion)<.00001);assert.deepEqual(box.scale.toArray(),[1,1,1]);
+      assert.deepEqual(model.vertices,source.vertices);
+      assert.deepEqual(model.polygons[0],source.polygons[0],'Do not repaint the package back');
+      assert.deepEqual(model.polygons.slice(2),source.polygons.slice(2),'Keep original side/frame/top UVs and colors');
+      assert.equal(source.polygons[1].texture,4,'The source model must not be mutated');
+      const expected=makeMeshes([model],{...textures,7:art.get(page)},[0,0,0]);
       assert.equal(box.children.length,expected.children.length);
       box.children.forEach((mesh,i)=>{
         const original=expected.children[i];
-        for(const attribute of ['position','uv','color']) assert.deepEqual(mesh.geometry.attributes[attribute].array,original.geometry.attributes[attribute].array);
-        assert.deepEqual(mesh.material.map.image.data,original.material.map.image.data);
+        for(const attribute of ['position','uv','color'])assert.deepEqual(mesh.geometry.attributes[attribute].array,original.geometry.attributes[attribute].array);
+        assert.deepEqual(mesh.material.map.image.data,original.material.map.image.data,'Sample the original BMP directly');
         assert.equal(mesh.material.map.isCanvasTexture,undefined);
+        assert.equal(mesh.material.alphaTest,0,'Original black printed details must be opaque');
       });
+      expected.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
     }
-    assert.ok(!requests.some(path=>/^\/cars\/.*\.(?:prm|bmp|hul)$/i.test(path)),'Showroom must not load cars for label previews');
-    showroom.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
-    expected.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
-    Object.values(textures).forEach(t=>t.dispose());
-  } finally {globalThis.fetch=originalFetch;}
+    assert.ok(!requests.some(path=>/^\/cars\/.*\.(?:prm|hul)$/i.test(path)),'No car-model downloads for box labels');
+    for(const texture of [...Object.values(textures),...art.values()])texture.dispose();
+  } finally {
+    globalThis.fetch=originalFetch;
+    showroom?.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
+  }
 });
 
 test("all 28 stock selections load their actual models, wheels and display metadata", async () => {
@@ -76,23 +91,28 @@ test("all 28 stock selections load their actual models, wheels and display metad
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test("all car boxes sit within the four original L-shaped shelf surfaces", () => {
-  const bytes=readFileSync("levels/frontend/frontend.w");
-  const world=parseWorld(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
-  const shelves=[];
-  for(const mesh of world.meshes) for(const face of mesh.polygons) {
-    const points=face.indices.slice(0,face.flags&1?4:3).map(i=>mesh.vertices[i].position.map((value,axis)=>value*(axis===1?-.1:.1)));
-    const min=[0,1,2].map(axis=>Math.min(...points.map(p=>p[axis])));
-    const max=[0,1,2].map(axis=>Math.max(...points.map(p=>p[axis])));
-    if(face.texture===0&&max[1]-min[1]<.1&&CAR_DISPLAY.shelfHeights.some(y=>Math.abs(y-min[1])<.1)) shelves.push({min,max});
+test("every car uses its own original FOB position, orientation and full-size package", async () => {
+  const buffer=path=>{const b=readFileSync(path);return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);};
+  const info=parseInfo(readFileSync("levels/frontend/frontend.inf","utf8"));
+  const objects=parseObjects(buffer("levels/frontend/frontend.fob"),info.STARTPOS);
+  const entries=objects.filter(object=>object.type===46&&object.flags[0]>=0);
+  const placements=originalBoxPlacements(objects);
+  assert.equal(entries.length,28);assert.equal(placements.size,28);
+  const important={rc:0,mite:1,beatall:5,dino:8,gencar:10,adeon:19,fone:20,cougar:23,sugo:24,toyeca:25,amw:26,panga:27};
+  for(const [id,boxId]of Object.entries(important))assert.equal(placements.get(id).boxId,boxId);
+  for(const object of entries){
+    const id=ORIGINAL_BOX_CARS[object.flags[0]],pose=placements.get(id);
+    assert.deepEqual(pose.position,object.position);
+    const forward=new THREE.Vector3(0,0,1).applyQuaternion(pose.quaternion);
+    assert.ok(forward.distanceTo(new THREE.Vector3(object.forward[0],-object.forward[1],object.forward[2]).normalize())<.00001);
   }
-  for(let index=0;index<STOCK_CARS.length;index++) {
-    const {position:p,rotation:r}=boxShelfPose(index),scale=CAR_DISPLAY.scale;
-    for(const x of [-8.4378,8.4378]) for(const z of [-10.5508,0]) {
-      const px=p[0]+(x*Math.cos(r)+z*Math.sin(r))*scale;
-      const pz=p[2]+(-x*Math.sin(r)+z*Math.cos(r))*scale;
-      const floor=p[1]-6.8308*scale;
-      assert.ok(shelves.some(s=>Math.abs(s.min[1]-floor)<.1&&px>=s.min[0]-.05&&px<=s.max[0]+.05&&pz>=s.min[2]-.05&&pz<=s.max[2]+.05),`Box ${index} must be supported by an existing shelf`);
-    }
+  assert.equal([...placements.values()].filter(p=>p.position.y<10).length,6,'Six boxes must be on the floor');
+});
+
+test("original box sheets identify every stock car, including Panga's separate tile",()=>{
+  for(let index=0;index<27;index++){
+    const tile=originalBoxArtwork(ORIGINAL_BOX_CARS[index]);
+    assert.deepEqual(tile,{page:Math.floor(index/9)+1,column:index%3,row:Math.floor(index%9/3)});
   }
+  assert.deepEqual(originalBoxArtwork('panga'),{page:5,column:2,row:1});
 });

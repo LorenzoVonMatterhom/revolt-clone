@@ -1419,6 +1419,52 @@ export function placeStartingGrid(physics,cars,heading) {
   return slots;
 }
 </script>
+    <script type="text/plain" data-game-module="car-boxes.js">
+import * as THREE from "three";
+
+// Native Re-Volt car IDs used by the 28 type-46 entries in frontend.fob.
+// This is independent of the menu's selection order.
+export const ORIGINAL_BOX_CARS = [
+  'rc','mite','phat','moss','mud','beatall','volken','tc6','dino',
+  'candy','gencar','tc4','mouse','flag','tc2','r5','tc5','sgt',
+  'tc3','adeon','fone','tc1','rotor','cougar','sugo','toyeca','amw','panga',
+];
+
+export function originalBoxPlacements(objects) {
+  const placements=new Map();
+  for(const object of objects) {
+    if(object.type!==46)continue;
+    const boxId=object.flags[0],id=ORIGINAL_BOX_CARS[boxId];
+    if(!id)continue; // The negative ID is a separate, non-car display object.
+    const up=new THREE.Vector3(-object.up[0],object.up[1],-object.up[2]).normalize();
+    const forward=new THREE.Vector3(object.forward[0],-object.forward[1],object.forward[2]).normalize();
+    const right=up.clone().cross(forward).normalize();forward.crossVectors(right,up).normalize();
+    const quaternion=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,forward));
+    placements.set(id,{boxId,position:object.position.clone(),quaternion});
+  }
+  return placements;
+}
+
+export function originalBoxArtwork(id) {
+  const nativeId=ORIGINAL_BOX_CARS.indexOf(id);
+  if(nativeId<0)throw new Error(`No original box artwork for ${id}`);
+  // RVGL preserves the first 27 stock tiles. Panga is tile 5 on the fifth
+  // sheet, after the Dreamcast cars, rather than the first Dreamcast tile.
+  const tile=id==='panga'?41:nativeId;
+  return {page:Math.floor(tile/9)+1,column:tile%3,row:Math.floor(tile%9/3)};
+}
+
+export function originalBoxModel(source,id) {
+  const model=structuredClone(source),{column,row}=originalBoxArtwork(id);
+  // Only the small white picture panel on the ORIGINAL front receives the
+  // appropriate original atlas tile. The back, frame, sides and top stay intact.
+  const x0=(column*85+.5)/256,x1=(column*85+84.5)/256;
+  const y0=(row*85+.5)/256,y1=(row*85+84.5)/256;
+  model.polygons[1].texture=7;
+  model.polygons[1].uv=[[x1,y0],[x1,y1],[x0,y1],[x0,y0]];
+  return model;
+}
+</script>
     <script type="text/plain" data-game-module="main.js">
 
 
@@ -3946,27 +3992,12 @@ export async function loadCar(id, name) {
 import * as THREE from "three";
 import { ShowroomNavigation } from "./showroom-navigation.js";
 import { gameAssetUrl } from "./assets.js";
-import { loadLevel, parsePrm, makeMeshes } from "./revolt.js";
+import { loadLevel, parsePrm, makeMeshes, decodeBitmap } from "./revolt.js";
+import { originalBoxPlacements, originalBoxArtwork, originalBoxModel } from "./car-boxes.js";
 import { FRONTEND } from "./levels.js";
 
 export const STOCK_CARS = ["rc", "tc6", "phat", "volken", "beatall", "mouse", "candy", "mite", "r5", "tc1", "mud", "moss", "gencar", "tc5", "tc4", "dino", "adeon", "tc3", "fone", "rotor", "amw", "flag", "sgt", "tc2", "cougar", "toyeca", "sugo", "panga"];
 
-
-// Built-in perpendicular shelves in the frontend showroom, matching the reference.
-export const CAR_DISPLAY = { center: [200.7, 0, 160.7], columns: 7, rows: 4, scale: 0.7,
-  shelfHeights: [21.8, 39.5, 57.9, 76.4] };
-
-export function boxShelfPose(index) {
-  const column = index % CAR_DISPLAY.columns;
-  const row = Math.floor(index / CAR_DISPLAY.columns);
-  // The original box front is local +Z; its depth extends behind the label.
-  return {
-    position: column < 4
-      ? [141 + column * 16, CAR_DISPLAY.shelfHeights[row] + 6.8308 * CAR_DISPLAY.scale, 160.7]
-      : [200.7, CAR_DISPLAY.shelfHeights[row] + 6.8308 * CAR_DISPLAY.scale, 151 - (column - 4) * 21],
-    rotation: column < 4 ? Math.PI : -Math.PI / 2,
-  };
-}
 
 export function carDetails(text, id) {
   const clean = text.replace(/;[^\r\n]*/g, "");
@@ -3980,20 +4011,29 @@ export class Showroom {
   static async create(renderer, manifest) {
     const showroom = new Showroom();
     const loaded = await loadLevel(FRONTEND, manifest, { collisions: false });
-    showroom.scene.add(loaded.group);
+    showroom.room.add(loaded.group);
     const response = await fetch(gameAssetUrl("/levels/frontend/carbox.m"));
-    const model = parsePrm(await response.arrayBuffer());
+    const source = parsePrm(await response.arrayBuffer());
+    const placements=originalBoxPlacements(loaded.objects);
+    const artwork=new Map(await Promise.all([1,2,3,5].map(async page=>[
+      page,decodeBitmap(await (await fetch(gameAssetUrl(`/cars/misc/carbox${page}.bmp`))).arrayBuffer()),
+    ])));
     showroom.cars = await Promise.all(STOCK_CARS.map(async (id) => carDetails(await (await fetch(gameAssetUrl(`/cars/${id}/parameters.txt`))).text(), id)));
-    // Use the four existing corner shelves; do not add a floating display rack.
+    // Use the exact native positions, including the floor stacks and shelf boxes.
     for (let index = 0; index < showroom.cars.length; index++) {
-      const box = makeMeshes([model], loaded.textures, [0, 0, 0]);
-      const pose = boxShelfPose(index);
-      box.scale.setScalar(CAR_DISPLAY.scale);
-      box.position.set(...pose.position);
-      box.rotation.y = pose.rotation;
-      box.userData.homeRotation = pose.rotation;
-      box.userData.home = box.position.clone(); box.userData.carIndex = index;
-      showroom.boxes.push(box); showroom.scene.add(box);
+      const id=showroom.cars[index].id,pose=placements.get(id);
+      if(!pose)throw new Error(`Missing original showroom position for ${id}`);
+      const model=originalBoxModel(source,id),{page}=originalBoxArtwork(id);
+      const box = makeMeshes([model], {...loaded.textures,7:artwork.get(page)}, [0, 0, 0]);
+      box.traverse(object=>{if(object.material){
+        // Package art is opaque printing; preserve its black ink and original RGB.
+        object.material.vertexColors=false;object.material.alphaTest=0;
+      }});
+      box.position.copy(pose.position);box.quaternion.copy(pose.quaternion);
+      box.userData.homeQuaternion = pose.quaternion.clone();
+      box.userData.home = pose.position.clone();box.userData.boxId=pose.boxId;
+      box.userData.carIndex = index;box.userData.carId=id;
+      showroom.boxes.push(box); showroom.room.add(box);
     }
     showroom.select(0);
     return showroom;
@@ -4001,6 +4041,9 @@ export class Showroom {
 
   constructor() {
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x111111);
+    // Reflect the native showroom's handedness so its left/right arrangement
+    // and printed box labels match the original view. Source textures are intact.
+    this.room=new THREE.Group();this.room.scale.x=-1;this.scene.add(this.room);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 800);
     this.navigation = new ShowroomNavigation(this.camera);
     this.boxes = []; this.selected = 0; this.ray = new THREE.Raycaster();
@@ -4025,19 +4068,21 @@ export class Showroom {
     // Start facing the existing L-shaped shelf corner shown in the reference.
     const portrait = aspect < 1;
     if (!this.navigation.initialized) {
-      this.camera.position.set(portrait ? 50 : 110, portrait ? 88 : 66, portrait ? -20 : 48);
-      this.camera.lookAt(190, portrait ? 25 : 47, 148);
+      this.camera.position.set(portrait ? -15 : -110, portrait ? 105 : 66, portrait ? -62 : 48);
+      this.camera.lookAt(-190, portrait ? 25 : 32, 148);
       this.navigation.initialized = true;
     }
     this.navigation.update(dt, keys);
     for (const [i, box] of this.boxes.entries()) {
-      const target = i === this.selected ? new THREE.Vector3(180, portrait ? 55 : 49, 128) : box.userData.home;
+      const target = i === this.selected ? new THREE.Vector3(portrait ? 174 : 208, portrait ? 54 : 50, 106) : box.userData.home;
       box.position.lerp(target, 1 - Math.exp(-dt * 9));
       const blend = 1 - Math.exp(-dt * 9);
-      const scale = i === this.selected ? 1.5 : CAR_DISPLAY.scale;
+      const scale = i === this.selected ? (portrait ? 1.6 : 2.2) : 1;
       box.scale.lerp(new THREE.Vector3(scale, scale, scale), blend);
-      const rotation = i === this.selected ? -2.4 : box.userData.homeRotation;
-      box.rotation.y += (rotation - box.rotation.y) * blend;
+      const rotation = i === this.selected
+        ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.atan2(target.x+this.camera.position.x,target.z-this.camera.position.z))
+        : box.userData.homeQuaternion;
+      box.quaternion.slerp(rotation,blend);
     }
     renderer.render(this.scene, this.camera);
   }
