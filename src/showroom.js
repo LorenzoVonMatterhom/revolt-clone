@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ShowroomNavigation } from "./showroom-navigation.js";
 import { gameAssetUrl } from "./assets.js";
-import { loadLevel, loadCar, parsePrm, makeMeshes } from "./revolt.js";
+import { loadLevel, parsePrm, makeMeshes } from "./revolt.js";
 import { FRONTEND } from "./levels.js";
 
 export const STOCK_CARS = ["rc", "tc6", "phat", "volken", "beatall", "mouse", "candy", "mite", "r5", "tc1", "mud", "moss", "gencar", "tc5", "tc4", "dino", "adeon", "tc3", "fone", "rotor", "amw", "flag", "sgt", "tc2", "cougar", "toyeca", "sugo", "panga"];
@@ -31,76 +31,17 @@ export function carDetails(text, id) {
     acceleration: number("Acc"), weight: number("Weight"), transmission: number("Trans") };
 }
 
-// Keep the original box geometry and atlas UVs; only its front label is car-specific.
-export function labeledBox(source) {
-  const model = structuredClone(source);
-  model.polygons.forEach((polygon, i) => {
-    polygon.colors = polygon.colors.map(() => [255, 255, 255, 255]);
-    if (i === 0) {
-      polygon.texture = 7;
-      polygon.uv = [[0, 0], [0, 1], [1, 1], [1, 0]];
-    }
-  });
-  return model;
-}
-
-function boxLabel(renderer, car, details, atlas) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512; canvas.height = 416;
-  const ctx = canvas.getContext("2d");
-  const image = atlas.image;
-  const original = document.createElement("canvas");
-  original.width = image.width; original.height = image.height;
-  original.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(image.data), image.width, image.height), 0, 0);
-  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, 512, 416);
-  ctx.drawImage(original, 0, 86, 132, 110, 0, 0, 512, 416);
-  ctx.fillStyle = "#ffffff"; ctx.fillRect(145, 64, 365, 336);
-  ctx.fillStyle = "#d32132"; ctx.font = "bold 30px Arial";
-  ctx.fillText(details.name.toUpperCase(), 153, 100, 348);
-
-  const preview = new THREE.Scene();
-  preview.add(car);
-  const bounds = new THREE.Box3().setFromObject(car);
-  const center = bounds.getCenter(new THREE.Vector3());
-  const size = bounds.getSize(new THREE.Vector3()).length();
-  const camera = new THREE.PerspectiveCamera(38, 1.4, 0.1, 200);
-  camera.position.copy(center).add(new THREE.Vector3(size * 0.8, size * 0.65, size * 0.9));
-  camera.lookAt(center);
-  const target = new THREE.WebGLRenderTarget(350, 250);
-  const oldTarget = renderer.getRenderTarget(), oldColor = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
-  renderer.setRenderTarget(target); renderer.setClearColor(0xffffff, 0);
-  renderer.render(preview, camera);
-  const pixels = new Uint8Array(350 * 250 * 4);
-  renderer.readRenderTargetPixels(target, 0, 0, 350, 250, pixels);
-  renderer.setRenderTarget(oldTarget); renderer.setClearColor(oldColor, oldAlpha);
-  const flipped = new Uint8ClampedArray(pixels.length);
-  for (let y = 0; y < 250; y++) flipped.set(pixels.subarray(y * 1400, (y + 1) * 1400), (249 - y) * 1400);
-  const rendered = document.createElement("canvas"); rendered.width = 350; rendered.height = 250;
-  rendered.getContext("2d").putImageData(new ImageData(flipped, 350, 250), 0, 0);
-  ctx.drawImage(rendered, 155, 122);
-  target.dispose();
-  preview.remove(car);
-  car.traverse((o) => { o.geometry?.dispose(); if (o.material) { o.material.map?.dispose(); o.material.dispose(); } });
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  return texture;
-}
-
 export class Showroom {
   static async create(renderer, manifest) {
     const showroom = new Showroom();
     const loaded = await loadLevel(FRONTEND, manifest, { collisions: false });
     showroom.scene.add(loaded.group);
     const response = await fetch(gameAssetUrl("/levels/frontend/carbox.m"));
-    const model = labeledBox(parsePrm(await response.arrayBuffer()));
+    const model = parsePrm(await response.arrayBuffer());
     showroom.cars = await Promise.all(STOCK_CARS.map(async (id) => carDetails(await (await fetch(gameAssetUrl(`/cars/${id}/parameters.txt`))).text(), id)));
     // Use the four existing corner shelves; do not add a floating display rack.
-    const previews = await Promise.all(showroom.cars.map(details => loadCar(details.id, details.name)));
-    for (const [index, details] of showroom.cars.entries()) {
-      const car = previews[index];
-      const label = boxLabel(renderer, car, details, loaded.textures[4]);
-      const box = makeMeshes([model], { ...loaded.textures, 7: label }, [0, 0, 0]);
+    for (let index = 0; index < showroom.cars.length; index++) {
+      const box = makeMeshes([model], loaded.textures, [0, 0, 0]);
       const pose = boxShelfPose(index);
       box.scale.setScalar(CAR_DISPLAY.scale);
       box.position.set(...pose.position);
