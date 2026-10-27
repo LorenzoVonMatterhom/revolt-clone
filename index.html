@@ -444,7 +444,7 @@ select:focus-visible {
         <div class="readouts">
           <div><span>Speed</span><strong id="speed">0</strong></div>
           <div><span>Lap</span><strong id="lap">1/3</strong></div>
-          <div><span>Place</span><strong id="place">1/4</strong></div>
+          <div><span>Place</span><strong id="place">8/8</strong></div>
           <div><span>Time</span><strong id="time">00:00</strong></div>
         </div>
       </div>
@@ -1016,6 +1016,15 @@ export class LapProgress {
     if (this.finished) return this.totalLaps * this.gates.length;
     if (!this.gates.length) return 0;
     const next = this.nextCheckpoint;
+    // Before reaching the start line on lap one, cars farther back on the
+    // starting grid must rank behind the cars in front, not ahead of them.
+    if (this.lap === 1 && next === 1) {
+      const start = this.gates[0], offset = position.clone().sub(start.position);
+      const along = offset.dot(start.normal);
+      const side = new THREE.Vector3(-start.normal.z,0,start.normal.x);
+      if (along < 0 && Math.abs(offset.dot(side)) <= start.halfWidth && Math.abs(offset.y) <= start.height)
+        return along / Math.max(1,start.position.distanceTo(this.gates[1].position));
+    }
     const completed = next === 0 ? this.gates.length - 1 : next - 1;
     const previous = this.gates[completed].position;
     const ahead = this.gates[next].position;
@@ -1361,6 +1370,55 @@ export class TurnGuide {
   }
 }
 </script>
+    <script type="text/plain" data-game-module="race-grid.js">
+import * as THREE from "three";
+
+export const OPPONENTS = [
+  {id:"volken",name:"Volken Turbo",pace:.92},
+  {id:"phat",name:"Phat Slug",pace:.88},
+  {id:"cougar",name:"Cougar",pace:.96},
+  {id:"tc6",name:"Sprinter XL",pace:.9},
+  {id:"sugo",name:"Super Pro",pace:.94},
+  {id:"toyeca",name:"Toyeca",pace:.95},
+  {id:"adeon",name:"Adeon",pace:.91},
+];
+
+// Cars are stored player first. Grid ranks run front to back, player last.
+export function makeStartingGrid(setups) {
+  const laneSpacing=Math.max(20,...setups.map(s=>Math.max(
+    Math.abs(s.center.x)+s.halfExtents.x,
+    ...s.wheels.map(w=>Math.abs(w.position.x)+(w.halfWidth??w.radius*.35))
+  )*2+4));
+  const rowSpacing=Math.max(24,...setups.map(s=>Math.max(
+    Math.abs(s.center.z)+s.halfExtents.z,
+    ...s.wheels.map(w=>Math.abs(w.position.z)+w.radius)
+  )*2+8));
+  return setups.map((_,index)=>{
+    const rank=index===0?setups.length-1:index-1,row=Math.floor(rank/2),column=rank%2;
+    return {rank,row,column,lateral:(column-.5)*laneSpacing,behind:row*rowSpacing+column*3};
+  });
+}
+
+export function placeStartingGrid(physics,cars,heading) {
+  const slots=makeStartingGrid(cars.map(car=>car.setup));
+  const forward=new THREE.Vector3(Math.sin(heading),0,Math.cos(heading));
+  const right=new THREE.Vector3(forward.z,0,-forward.x);
+  const rotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),heading);
+  // Clear old grid/race positions before placing front-to-back, so stale cars
+  // cannot displace other racers or send the player back into the front row.
+  cars.forEach(car=>car.body.setEnabled(false));
+  try {
+    for(const {index} of slots.map((slot,index)=>({...slot,index})).sort((a,b)=>a.rank-b.rank)) {
+      const slot=slots[index],position=right.clone().multiplyScalar(slot.lateral).addScaledVector(forward,-slot.behind);
+      const floor=physics.groundAt(position,15,80);
+      if(floor!==null)position.y=floor;
+      if(!physics.placeCar(cars[index],position,rotation))throw new Error('Could not place the starting grid on this track');
+      cars[index].body.setEnabled(true);
+    }
+  } finally {cars.forEach(car=>car.body.setEnabled(true));}
+  return slots;
+}
+</script>
     <script type="text/plain" data-game-module="main.js">
 
 
@@ -1379,6 +1437,7 @@ import { RaceAI, makeRaceRoute, makeAiRoute, findAiRecovery } from "./race-ai.js
 import { makeLapGates, LapProgress } from "./lap-progress.js";
 import { RaceCountdown, RaceCues } from "./race-cues.js";
 import { TurnGuide } from "./track-directions.js";
+import { OPPONENTS, placeStartingGrid } from "./race-grid.js";
 import { SkidMarks, isSkidding } from "./skid-marks.js";
 
 const canvas = document.querySelector("#scene");
@@ -1691,25 +1750,29 @@ class CarController {
     this.lastTrackIndex = 0;
     this.placeScore = 0;
     this.lapTracker = new LapProgress(checkpoints, TOTAL_LAPS);
-    this.resetTo(0, options.startOffset || 0, (samples - (options.startIndex || samples)) / 6);
+    this.ensurePhysics();
   }
 
-  resetTo(index, offset = 0, gridRow = 0) {
+  ensurePhysics() {
+    if (this.physics !== physics) {
+      this.physics = physics;
+      this.car = physics.createCar(this.mesh, { autoRighting: !this.isPlayer });
+    }
+  }
+
+  resetTo(index, offset = 0) {
     if (this.isPlayer) {
       this.scrapeHold = 0;
       if (sounds.scrape.isPlaying) sounds.scrape.stop();
     }
     skidMarks?.previous.delete(this);
     this.sliding = false;
-    if (this.physics !== physics) {
-      this.physics = physics;
-      this.car = physics.createCar(this.mesh, { autoRighting: !this.isPlayer });
-    }
+    this.ensurePhysics();
     const heading = index && tangents[index] ? Math.atan2(tangents[index].x, tangents[index].z) : (loadedLevel.info.STARTROT?.[0] ?? 0) * Math.PI * 2;
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
     const right = new THREE.Vector3(forward.z, 0, -forward.x);
     const p = index && centerline[index] ? centerline[index].clone() : new THREE.Vector3();
-    p.addScaledVector(right, offset).addScaledVector(forward, -gridRow * 20);
+    p.addScaledVector(right, offset);
     const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
     let placed = physics.placeCar(this.car, p, rotation);
     if (!placed && this.car.safePose) placed = physics.placeCar(this.car, this.car.safePose.position, this.car.safePose.rotation);
@@ -1719,16 +1782,20 @@ class CarController {
     this.lapTracker?.relocate(this.position);
   }
 
-  restart(index, offset = 0) {
+  prepareRace() {
+    this.ensurePhysics();
     this.ai = new RaceAI(loadedLevel.aiRoute, this.aiSpeed, this.mesh.userData.physics);
-    this.resetTo(0, offset, (samples - (index || samples)) / 6);
-    this.lapTracker?.reset(checkpoints, this.position);
     this.lap = 1;
     this.finished = false;
     this.nextCheckpoint = 1;
     this.progress = 0;
     this.placeScore = 0;
     this.bumpCooldown = 0;
+    this.steer = 0; this.throttle = 0; this.sliding = false; this.scrapeHold = 0;
+    this.car.setup.wheels.forEach((_,i)=>{
+      this.car.vehicle.setWheelSteering(i,0);this.car.vehicle.setWheelEngineForce(i,0);this.car.vehicle.setWheelBrake(i,0);
+      this.car.wheelColliders[i].setRotationWrtParent(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2));
+    });
   }
 
   update(dt) {
@@ -1845,14 +1912,26 @@ for (const name of new Set([...POWERUPS.map((p) => p.sound), "pickup", "firebang
 }
 await buildLevel(currentLevel);
 
-const playerMesh = await makeCar("rc", "RC Bandit");
-const racers = [
-  new CarController(playerMesh, { isPlayer: true, startIndex: 0, startOffset: -3.3 }),
-  new CarController(await makeCar("volken", "Volken Turbo"), { startIndex: 354, startOffset: 3.2, aiTargetOffset: 1.2, aiSpeed: 0.92 }),
-  new CarController(await makeCar("phat", "Phat Slug"), { startIndex: 348, startOffset: -1.4, aiTargetOffset: -2.2, aiSpeed: 0.88 }),
-  new CarController(await makeCar("cougar", "Cougar"), { startIndex: 342, startOffset: 3.8, aiTargetOffset: 2.8, aiSpeed: 0.96 }),
-];
+const meshes = await Promise.all([
+  makeCar("rc", "RC Bandit"),
+  ...OPPONENTS.map(opponent=>makeCar(opponent.id,opponent.name)),
+]);
+const racers = meshes.map((mesh,index)=>new CarController(mesh,index===0
+  ? {isPlayer:true} : {aiSpeed:OPPONENTS[index-1].pace}));
 let player = racers[0];
+
+function restartRaceGrid() {
+  racers.forEach(racer=>racer.prepareRace());
+  const heading=(loadedLevel.info.STARTROT?.[0]??0)*Math.PI*2;
+  const slots=placeStartingGrid(physics,racers.map(racer=>racer.car),heading);
+  racers.forEach((racer,index)=>{
+    racer.gridSlot=slots[index];racer.syncPhysics();
+    racer.lapTracker.reset(checkpoints,racer.position);
+    racer.placeScore=racer.lapTracker.score(racer.position);
+    racer.lastTrackIndex=nearestTrackData(racer.position).index;
+  });
+}
+restartRaceGrid();
 powerups.reset(racers);
 
 for (const item of POWERUPS) {
@@ -1964,10 +2043,7 @@ async function switchLevel(nextIndex) {
   openMenu();
   const built = await buildLevel(currentLevel);
   if (!built) return;
-  racers[0].restart(0, -3.3);
-  racers[1].restart(354, 3.2);
-  racers[2].restart(348, -1.4);
-  racers[3].restart(342, 3.8);
+  restartRaceGrid();
   powerups.reset(racers);
   updateCamera(1);
   updateHud();
@@ -2201,12 +2277,12 @@ startBtn.addEventListener("click", async () => {
       physics.removeCar(player.car);
       player.mesh.userData.engine.audio.disconnect();
       player.mesh.traverse((o) => { o.geometry?.dispose(); if (o.material) { o.material.map?.dispose(); o.material.dispose(); } });
-      racers[0] = player = new CarController(mesh, { isPlayer: true, startOffset: -3.3 });
+      racers[0] = player = new CarController(mesh, { isPlayer: true });
       playerCarId = choice.id;
     }
     elapsedRace = 0;
     skidMarks.clear();
-    racers.forEach((racer, i) => racer.restart(i ? 360 - i * 6 : 0, [-3.3, 3.2, -1.4, 3.8][i]));
+    restartRaceGrid();
     powerups.reset(racers);
   } catch (error) {
     console.error(error); document.querySelector("#startDescription").textContent = error.message;

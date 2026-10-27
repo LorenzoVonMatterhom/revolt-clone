@@ -124,6 +124,15 @@ export class LapProgress {
     if (this.finished) return this.totalLaps * this.gates.length;
     if (!this.gates.length) return 0;
     const next = this.nextCheckpoint;
+    // Before reaching the start line on lap one, cars farther back on the
+    // starting grid must rank behind the cars in front, not ahead of them.
+    if (this.lap === 1 && next === 1) {
+      const start = this.gates[0], offset = position.clone().sub(start.position);
+      const along = offset.dot(start.normal);
+      const side = new THREE.Vector3(-start.normal.z,0,start.normal.x);
+      if (along < 0 && Math.abs(offset.dot(side)) <= start.halfWidth && Math.abs(offset.y) <= start.height)
+        return along / Math.max(1,start.position.distanceTo(this.gates[1].position));
+    }
     const completed = next === 0 ? this.gates.length - 1 : next - 1;
     const previous = this.gates[completed].position;
     const ahead = this.gates[next].position;
