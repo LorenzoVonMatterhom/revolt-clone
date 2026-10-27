@@ -1,5 +1,10 @@
 import * as THREE from "three";
 
+// Conservative relative to measured full-brake deceleration on stock cars.
+// The old 14-unit estimate made opponents coast hundreds of units too soon.
+const AI_BRAKING_DECELERATION = 30;
+const AI_CORNER_ACCELERATION = 70;
+
 export function makeRaceRoute(points) {
   const curve = new THREE.CurvePath();
   for (let i = 0; i < points.length; i++) curve.add(new THREE.LineCurve3(points[i], points[(i + 1) % points.length]));
@@ -131,7 +136,7 @@ export class RaceAI {
       return { throttle: -0.3, brake: 0, steering: -steering };
     }
     let desiredSpeed = 185 * this.pace;
-    const stoppingDistance = speed * speed / 28 + 25;
+    const stoppingDistance = speed * speed / (2 * AI_BRAKING_DECELERATION) + 25;
     // Brake before sharp authored corners, instead of aiming through nearby walls.
     for (let i = 0; i < this.points.length; i++) {
       const corner = (segment + i + 1) % this.points.length;
@@ -144,13 +149,14 @@ export class RaceAI {
       if (turn > 0.3) {
         const segmentLength=Math.min(this.lengths[(corner-1+this.points.length)%this.points.length],this.lengths[corner]);
         const radius=Math.max(5,segmentLength*0.7/(2*Math.sin(turn/2)));
-        const turnLimit=32+118*Math.max(0,1-turn/(Math.PI/2));
-        const cornerSpeed=Math.min(THREE.MathUtils.clamp(Math.sqrt(radius*45),28,150),turnLimit);
-        const approachSpeed = Math.sqrt(cornerSpeed * cornerSpeed + 28 * Math.max(0, distance - 15));
+        // Match corner pace to the doubled race speed while keeping hairpins slower.
+        const turnLimit=55+95*Math.max(0,1-turn/(Math.PI/2));
+        const cornerSpeed=Math.min(THREE.MathUtils.clamp(Math.sqrt(radius*AI_CORNER_ACCELERATION),38,150),turnLimit);
+        const approachSpeed = Math.sqrt(cornerSpeed * cornerSpeed + 2 * AI_BRAKING_DECELERATION * Math.max(0, distance - 15));
         desiredSpeed = Math.min(desiredSpeed, approachSpeed);
       }
     }
-    if (Math.abs(angle) > 0.65 || routeError > 12) desiredSpeed = Math.min(desiredSpeed, 35);
+    if (Math.abs(angle) > 0.65 || routeError > 12) desiredSpeed = Math.min(desiredSpeed, 50);
     desiredSpeed=Math.min(desiredSpeed,trafficLimit);
     if(trafficLimit===0) return {throttle:0,brake:1,steering};
     return { throttle: THREE.MathUtils.clamp(0.15 + (desiredSpeed - speed) * 0.04, 0, 1), brake: THREE.MathUtils.clamp((speed - desiredSpeed) / 15, 0, 1), steering };

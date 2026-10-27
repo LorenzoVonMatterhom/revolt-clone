@@ -301,8 +301,8 @@ export class MeshPhysics {
       car.vehicle.setWheelSideFrictionStiffness(i, traction);
     }
     car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, TERRAIN_GROUPS, collider => collider.handle === this.terrain?.handle);
-    // At full throttle the tire solver saturates lateral grip, despite full
-    // visible steering lock. Support the player's grounded turn at the chassis.
+    // At full throttle the tire solver saturates lateral grip. Give both the
+    // player and opponents grounded guidance without adding drive power.
     const upright = new THREE.Vector3(0, 1, 0).applyQuaternion(car.body.rotation()).y;
     const contacts = car.setup.wheels.filter((_, i) => car.vehicle.wheelIsInContact(i)).length;
     // Rear-driven launches can pivot the light chassis onto its rear axle.
@@ -321,7 +321,7 @@ export class MeshPhysics {
         car.body.setAngvel(spin, true);
       }
     }
-    if (steeringGain > 1 && car.driveIntent && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
+    if (car.driveIntent && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > (steeringGain > 1 ? 0.05 : 0.005)) {
       const wheels = car.setup.wheels;
       const wheelbase = Math.max(4, Math.max(...wheels.map(w => w.position.z)) - Math.min(...wheels.map(w => w.position.z)));
       // Match the actual tire angle at launch; a shallower assisted turn makes
@@ -331,7 +331,11 @@ export class MeshPhysics {
         if (wheel.turnable ?? wheel.position.z > 0) { wheelAngle += car.vehicle.wheelSteering(i) ?? 0; turningWheels++; }
       });
       wheelAngle /= Math.max(1,turningWheels);
-      const yawTarget = playerYawTarget(speed, wheelbase, steering, wheelAngle / speedSteering) * speedSteering;
+      // Human input keeps its gradual yaw cap. AI supplies a calibrated wheel
+      // angle; shrinking that cap by its small input would understeer every bend.
+      const yawTarget = steeringGain > 1
+        ? playerYawTarget(speed, wheelbase, steering, wheelAngle / speedSteering) * speedSteering
+        : THREE.MathUtils.clamp(speed / wheelbase * Math.tan(wheelAngle), -2.8, 2.8);
       const spin = car.body.angvel();
       car.body.setAngvel({ x: spin.x, y: THREE.MathUtils.lerp(spin.y, yawTarget, 1 - Math.exp(-40 * dt)), z: spin.z }, true);
       const side = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
