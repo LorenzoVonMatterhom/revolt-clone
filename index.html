@@ -2091,12 +2091,11 @@ function formatTime(seconds) {
 
 function updateCamera(dt) {
   const forward = tempVec.set(Math.sin(player.heading), 0, Math.cos(player.heading));
-  const speed = player.velocity.length();
   let desired;
   let lookAt;
 
   if (cameraMode === 0) {
-    desired = player.position.clone().addScaledVector(forward, -16 - speed * 0.16).add(new THREE.Vector3(0, 7.5, 0));
+    desired = player.position.clone().addScaledVector(forward, -16).add(new THREE.Vector3(0, 7.5, 0));
     lookAt = player.position.clone().addScaledVector(forward, 11).add(new THREE.Vector3(0, 2.2, 0));
   } else if (cameraMode === 1) {
     desired = player.position.clone().add(new THREE.Vector3(0, 42, 0)).addScaledVector(forward, -4);
@@ -2106,7 +2105,9 @@ function updateCamera(dt) {
     lookAt = player.position.clone().addScaledVector(forward, 28).add(new THREE.Vector3(0, 1.2, 0));
   }
 
-  camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
+  // Follow translation directly so smoothing cannot stretch the chase distance.
+  if (cameraMode === 0) camera.position.copy(desired);
+  else camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
   if (loadedLevel && cameraMode === 0) {
     const target = player.position.clone().add(new THREE.Vector3(0, 2, 0));
     const direction = camera.position.clone().sub(target);
