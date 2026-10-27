@@ -2273,10 +2273,10 @@ export function smoothPlayerSteering(current, target, dt) {
   return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-Math.max(0, dt) * rate));
 }
 
-export function playerYawTarget(speed, wheelbase, steering) {
+export function playerYawTarget(speed, wheelbase, steering, wheelAngle = steering * 0.65) {
   if (steering === 0) return 0;
   const limit = 2.8 * Math.abs(steering);
-  return THREE.MathUtils.clamp(speed / wheelbase * Math.tan(steering * 0.65), -limit, limit);
+  return THREE.MathUtils.clamp(speed / wheelbase * Math.tan(wheelAngle), -limit, limit);
 }
 
 export function initializePhysics() {
@@ -2582,16 +2582,36 @@ export class MeshPhysics {
         car.body.setAngvel(spin, true);
       }
     }
-    if (steeringGain > 1 && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
+    if (steeringGain > 1 && car.driveIntent && !slippery && !handbrake && waterFraction < 0.2 && upright > 0.7 && contacts >= 2 && Math.abs(speed) > 3 && Math.abs(steering) > 0.05) {
       const wheels = car.setup.wheels;
       const wheelbase = Math.max(4, Math.max(...wheels.map(w => w.position.z)) - Math.min(...wheels.map(w => w.position.z)));
-      const yawTarget = playerYawTarget(speed, wheelbase, steering) * speedSteering;
+      // Match the actual tire angle at launch; a shallower assisted turn makes
+      // fully steered tires scrub against the chassis instead of accelerating.
+      let wheelAngle = 0, turningWheels = 0;
+      wheels.forEach((wheel,i)=>{
+        if (wheel.turnable ?? wheel.position.z > 0) { wheelAngle += car.vehicle.wheelSteering(i) ?? 0; turningWheels++; }
+      });
+      wheelAngle /= Math.max(1,turningWheels);
+      const yawTarget = playerYawTarget(speed, wheelbase, steering, wheelAngle / speedSteering) * speedSteering;
       const spin = car.body.angvel();
       car.body.setAngvel({ x: spin.x, y: THREE.MathUtils.lerp(spin.y, yawTarget, 1 - Math.exp(-40 * dt)), z: spin.z }, true);
       const side = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
       const velocity = new THREE.Vector3().copy(car.body.linvel());
-      const correction = -velocity.dot(side) * (1 - Math.exp(-16 * dt)) * car.body.mass();
-      car.body.applyImpulse(side.multiplyScalar(correction), true);
+      // A turning car's center of mass moves sideways relative to its heading.
+      // Resist slip at the rear axle, rather than braking that legitimate motion.
+      const rearZ = Math.min(...wheels.map(w=>w.position.z));
+      const rearToCom = THREE.MathUtils.clamp(car.body.localCom().z-rearZ,0,wheelbase);
+      const targetSideSpeed = car.body.angvel().y * rearToCom;
+      const correction = (targetSideSpeed-velocity.dot(side)) * (1 - Math.exp(-16 * dt));
+      const corrected = velocity.clone().addScaledVector(side,correction);
+      const horizontalSpeed = Math.hypot(velocity.x,velocity.z);
+      const correctedSpeed = Math.hypot(corrected.x,corrected.z);
+      // Tire guidance may redirect or dissipate motion, never create drive power.
+      if (correctedSpeed > horizontalSpeed) {
+        const scale = horizontalSpeed / correctedSpeed;
+        corrected.x *= scale; corrected.z *= scale;
+      }
+      car.body.applyImpulse(corrected.sub(velocity).multiplyScalar(car.body.mass()), true);
     }
     car.wheelColliders.forEach((tire, i) => {
       const wheel = car.setup.wheels[i];

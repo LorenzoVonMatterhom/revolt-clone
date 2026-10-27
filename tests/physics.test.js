@@ -570,3 +570,47 @@ test("small steering inputs cannot instantly trigger maximum high-speed turning 
     assert.ok(Math.abs(playerYawTarget(speed,8,-1)+playerYawTarget(speed,8,1))<1e-6);
   }
 });
+
+for (const id of ['rc','cougar','volken','sugo','phat','candy','tc5','tc4','tc3','amw','tc2']) test(`${id} accelerates from rest with full steering held in either direction`, async () => {
+  const savedFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  let mesh;
+  try {
+    mesh=await loadCar(id,id);
+    let straightSpeed;
+    for(const steering of [0,-1,1]) {
+      const ground=new THREE.Group();box(ground,[4000,1,4000],[0,-.5,0]);
+      const physics=new MeshPhysics(ground),car=physics.createCar(mesh,{autoRighting:false});
+      try {
+        physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion());
+        for(let i=0;i<120;i++){physics.updateVehicle(car,1/120,0,0,steering,false,1,2.1);physics.step();}
+        let minimumUp=1;
+        for(let i=0;i<240;i++) {
+          physics.updateVehicle(car,1/120,1,0,steering,false,1,2.1);physics.step();
+          minimumUp=Math.min(minimumUp,new THREE.Vector3(0,1,0).applyQuaternion(car.body.rotation()).y);
+        }
+        const velocity=car.body.linvel(),speed=Math.hypot(velocity.x,velocity.z);
+        if(steering===0){straightSpeed=speed;continue;}
+        assert.ok(speed>straightSpeed*.25,`${id}: full-lock launch stalled at ${speed}, straight ${straightSpeed}`);
+        assert.ok(minimumUp>.9,`${id}: launch must stay upright`);
+        assert.ok(Math.abs(car.body.angvel().y)>.5,`${id}: retain the tight turn while accelerating`);
+      } finally {physics.dispose();}
+    }
+  } finally {globalThis.fetch=savedFetch;mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
+});
+
+test('turn assistance cannot propel a coasting car with no throttle', async () => {
+  const savedFetch=globalThis.fetch;globalThis.fetch=async url=>new Response(readFileSync(String(url).slice(1)));
+  let mesh,physics;
+  try {
+    mesh=await loadCar('rc','RC Bandit');const ground=new THREE.Group();box(ground,[4000,1,4000],[0,-.5,0]);
+    physics=new MeshPhysics(ground);const car=physics.createCar(mesh);physics.placeCar(car,new THREE.Vector3(),new THREE.Quaternion());
+    for(let i=0;i<120;i++){physics.updateVehicle(car,1/120,0,0,0,false,1,2.1);physics.step();}
+    car.body.setLinvel({x:0,y:0,z:15},true);
+    for(let i=0;i<360;i++) {
+      physics.updateVehicle(car,1/120,0,0,1,false,1,2.1);physics.step();
+      const velocity=car.body.linvel();assert.ok(Math.hypot(velocity.x,velocity.z)<=15.1,'Steering must not add drive power');
+    }
+    const velocity=car.body.linvel();assert.ok(Math.hypot(velocity.x,velocity.z)<10,'Coasting must lose speed naturally');
+  } finally {globalThis.fetch=savedFetch;physics?.dispose();mesh?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
+});
