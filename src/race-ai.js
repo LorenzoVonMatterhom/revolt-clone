@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { carTopSpeed } from "./car-performance.js";
 
 // Conservative relative to measured full-brake deceleration on stock cars.
 // The old 14-unit estimate made opponents coast hundreds of units too soon.
@@ -59,6 +60,7 @@ export class RaceAI {
   constructor(points, pace = 0.9, setup = null) {
     this.points = points;
     this.pace = pace;
+    this.topSpeed = carTopSpeed(setup);
     const wheels=setup?.wheels??[];
     this.wheelbase=wheels.length?Math.max(...wheels.map(wheel=>wheel.position.z))-Math.min(...wheels.map(wheel=>wheel.position.z)):8;
     this.steeringAngle=Math.max(0.1,...wheels.filter(wheel=>wheel.turnable).map(wheel=>wheel.steerRatio));
@@ -135,7 +137,7 @@ export class RaceAI {
       this.reversing = Math.max(0, this.reversing - dt);
       return { throttle: -0.3, brake: 0, steering: -steering };
     }
-    let desiredSpeed = 185 * this.pace;
+    let desiredSpeed = this.topSpeed * (185 / 180) * this.pace;
     const stoppingDistance = speed * speed / (2 * AI_BRAKING_DECELERATION) + 25;
     // Brake before sharp authored corners, instead of aiming through nearby walls.
     for (let i = 0; i < this.points.length; i++) {
