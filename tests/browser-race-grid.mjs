@@ -6,7 +6,8 @@ mkdirSync(screenshots,{recursive:true});
 function install(){
  renderer.setPixelRatio(.6);renderer.shadowMap.enabled=false;
  window.__gridTest={
-  state(){return{count:racers.length,opponents:racers.filter(r=>!r.isPlayer).length,place:placeEl.textContent,locked:raceCountdown.locked,car:playerCarId,cars:racers.map(r=>({name:r.name,slot:r.gridSlot,position:r.position.toArray(),enabled:r.car.body.isEnabled(),speed:r.velocity.length()}))};},
+  state(){return{count:racers.length,opponents:racers.filter(r=>!r.isPlayer).length,place:placeEl.textContent,locked:raceCountdown.locked,car:playerCarId,cars:racers.map(r=>({name:r.name,slot:r.gridSlot,position:r.position.toArray(),enabled:r.car.body.isEnabled(),speed:r.velocity.length(),topSpeed:r.car.setup.topSpeed}))};},
+  verifySpeedometer(){const before=player.velocity.clone();player.velocity.set(0,0,50*SPEED_UNITS_PER_MPH);updateHud();const displayed=speedEl.textContent;player.velocity.copy(before);updateHud();return displayed;},
   drive(){raceCountdown.elapsed=4;raceCountdown.stage=null;for(let i=0;i<240;i++)stepRacePhysics();updateHud();return this.state();},
  };
 }
@@ -21,6 +22,8 @@ try{
   await page.waitForFunction(()=>document.querySelector('#scene').dataset.view==='race'&&document.querySelector('#scene').dataset.countdown==='3',null,{timeout:60000});
   const grid=await page.evaluate(()=>window.__gridTest.state());
   if(grid.count!==8||grid.opponents!==7||grid.place!=='8/8'||grid.cars[0].slot.row!==3||grid.cars.some(r=>!r.enabled))throw Error(JSON.stringify(grid));
+  if(grid.cars[0].topSpeed!==(choice==='24'?49:33.5)||new Set(grid.cars.map(car=>car.topSpeed)).size<4)throw Error('Car specifications were not loaded: '+JSON.stringify(grid));
+  if(await page.evaluate(()=>window.__gridTest.verifySpeedometer())!=='50')throw Error('Speedometer unit conversion is incorrect');
   if(track==='nhood1')await page.screenshot({path:`${screenshots}/eight-car-starting-grid.png`});
   const driven=await page.evaluate(()=>window.__gridTest.drive());
   const moved=driven.cars.slice(1).filter((car,i)=>car.position.some((v,axis)=>Math.abs(v-grid.cars[i+1].position[axis])>1)).length;

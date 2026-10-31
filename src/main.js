@@ -1,6 +1,7 @@
 import "./styles.css";
 import "./touch-controls.css";
 import { createTouchControls } from "./touch-controls.js";
+import { SPEED_UNITS_PER_MPH } from "./car-performance.js";
 import { gameAssetUrl } from "./assets.js";
 import * as THREE from "three";
 import { installAudioLifecycle } from "./audio-lifecycle.js";
@@ -414,7 +415,7 @@ class CarController {
       }
     }
 
-    this.steer = this.isPlayer ? smoothPlayerSteering(this.steer, steerInput, dt) : THREE.MathUtils.lerp(this.steer, steerInput, 1 - Math.exp(-dt * 7.5));
+    this.steer = this.isPlayer ? smoothPlayerSteering(this.steer, steerInput, dt, this.car.setup.steerRate ?? 3) : THREE.MathUtils.lerp(this.steer, steerInput, 1 - Math.exp(-dt * 7.5 * (this.car.setup.steerRate ?? 3) / 3));
     const trackData = nearestTrackData(this.position);
     const reversing = brake && speed < 2;
     this.throttle = throttle - (reversing ? brake : 0);
@@ -697,7 +698,7 @@ function updateCamera(dt) {
 }
 
 function updateHud() {
-  const speed = Math.round(player.velocity.length() * 2.7);
+  const speed = Math.round(player.velocity.length() / SPEED_UNITS_PER_MPH);
   const sorted = [...racers].sort((a, b) => b.placeScore - a.placeScore);
   const place = sorted.indexOf(player) + 1;
   speedEl.textContent = speed.toString();

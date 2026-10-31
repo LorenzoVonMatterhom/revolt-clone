@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { carTopSpeed, CAR_MASS_SCALE, ENGINE_FORCE_SCALE, RACE_SPEED_MULTIPLIER } from "./car-performance.js";
 
 let initialization;
 export function keyboardSteering(left, right) {
@@ -7,8 +8,8 @@ export function keyboardSteering(left, right) {
   return Number(left) - Number(right);
 }
 
-export function smoothPlayerSteering(current, target, dt) {
-  const rate = target === 0 ? 8 : 5;
+export function smoothPlayerSteering(current, target, dt, steerRate = 3) {
+  const rate = (target === 0 ? 8 : 5) * steerRate / 3;
   return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-Math.max(0, dt) * rate));
 }
 
@@ -108,12 +109,17 @@ export class MeshPhysics {
 
   createCar(mesh, { autoRighting = true } = {}) {
     const setup = mesh.userData.physics;
-    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true).setSoftCcdPrediction(0.5).setLinearDamping(0.15).setAngularDamping(1.5));
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true).setSoftCcdPrediction(0.5).setLinearDamping((setup.resistance ?? 0.001) * 150).setAngularDamping((setup.angularResistance ?? 0.001) * 1500));
     const { halfExtents: size, center } = setup;
     const hull = setup.bodyVertices?.length >= 12 ? RAPIER.ColliderDesc.convexHull(setup.bodyVertices) : null;
     const shapeOffset = hull ? new THREE.Vector3() : center.clone();
     const descriptor = hull ?? RAPIER.ColliderDesc.cuboid(size.x, size.y, size.z).setTranslation(center.x, center.y, center.z);
-    const collider = this.world.createCollider(descriptor.setMass(8).setFriction(0.3).setRestitution(0.02).setContactSkin(0.02).setCollisionGroups(CHASSIS_GROUPS).setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60), body);
+    descriptor.setMass(setup.bodyMass === undefined ? 8 : setup.bodyMass * CAR_MASS_SCALE);
+    if (setup.inertia && setup.centerOfMass) descriptor.setMassProperties(
+      setup.bodyMass * CAR_MASS_SCALE, setup.centerOfMass.clone().sub(shapeOffset),
+      new THREE.Vector3(...setup.inertia).multiplyScalar(CAR_MASS_SCALE * 0.1 * 0.1), new THREE.Quaternion(),
+    );
+    const collider = this.world.createCollider(descriptor.setFriction((setup.bodyFriction ?? 0.8) * 0.375).setRestitution(0.02).setContactSkin(0.02).setCollisionGroups(CHASSIS_GROUPS).setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60), body);
     const vehicle = this.world.createVehicleController(body);
     vehicle.indexUpAxis = 1;
     vehicle.setIndexForwardAxis = 2;
@@ -137,11 +143,11 @@ export class MeshPhysics {
       const tire = RAPIER.ColliderDesc.roundCylinder(halfWidth, radius, Math.min(0.05, radius * 0.1))
         .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))
         .setTranslation(wheel.position.x, wheel.position.y, wheel.position.z)
-        .setMass(0).setFriction(0.05).setRestitution(0).setContactSkin(0.01).setCollisionGroups(TIRE_GROUPS)
+        .setMass((wheel.mass ?? 0) * CAR_MASS_SCALE).setFriction(0.05).setRestitution(0).setContactSkin(0.01).setCollisionGroups(TIRE_GROUPS)
         .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(60);
       return this.world.createCollider(tire, body);
     });
-    const car = { body, vehicle, setup, autoRighting, collider, wheelColliders, shapeOffset, safePose: null, recoveryCooldown: 0, embeddedTime: 0, blockedTime: 0, stackedTime: 0, driveIntent: false, impact: 0, scrape: 0 };
+    const car = { body, vehicle, setup, autoRighting, collider, wheelColliders, shapeOffset, safePose: null, recoveryCooldown: 0, embeddedTime: 0, blockedTime: 0, stackedTime: 0, engineThrottle: 0, driveIntent: false, impact: 0, scrape: 0 };
     for (const shape of [collider, ...wheelColliders]) this.impactCars.set(shape.handle, car);
     return car;
   }
@@ -187,7 +193,7 @@ export class MeshPhysics {
         car.body.setLinvel({ x: 0, y: 0, z: 0 }, true); car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         this.world.propagateModifiedBodyPositionsToColliders();
         car.safePose = { position: position.clone(), rotation: new THREE.Quaternion().copy(rotation) };
-        car.recoveryCooldown = 0; car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0; car.impact=0; car.scrape=0;
+        car.engineThrottle = 0; car.recoveryCooldown = 0; car.embeddedTime = 0; car.blockedTime = 0; car.stackedTime=0; car.impact=0; car.scrape=0;
         return true;
       }
     }
@@ -274,15 +280,19 @@ export class MeshPhysics {
     const waterFraction = this.water?.applyCar(car, dt) ?? 0;
     car.driveIntent = Math.abs(throttle) > 0.1;
     const slippery = traction < 1;
-    car.body.setAngularDamping(slippery ? 0.12 : 1.5);
-    car.collider?.setFriction(slippery ? 0.015 : 0.3);
+    car.body.setAngularDamping(slippery ? 0.12 : (car.setup.angularResistance ?? 0.001) * 1500);
+    car.collider?.setFriction(slippery ? 0.015 : (car.setup.bodyFriction ?? 0.8) * 0.375);
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(new THREE.Quaternion().copy(car.body.rotation()));
     const speed = new THREE.Vector3().copy(car.body.linvel()).dot(forward);
     // Motor torque falls toward top speed instead of accelerating indefinitely.
     // Reverse remains slower; do not clamp velocity from slopes or external impacts.
     const driveSpeed = Math.max(0, speed * Math.sign(throttle));
-    const speedMultiplier = 2;
-    const topSpeed = speedMultiplier * (throttle < 0 ? 35 : 90) * Math.max(1, Math.abs(throttle));
+    const speedMultiplier = RACE_SPEED_MULTIPLIER;
+    const topSpeed = carTopSpeed(car.setup) * (throttle < 0 ? 35 / 90 : 1) * Math.max(1, Math.abs(throttle));
+    // EngineRate governs voltage build-up; releasing/cutting power is immediate.
+    if (car.setup.engineRate !== undefined && throttle * car.engineThrottle >= 0 && Math.abs(throttle) > Math.abs(car.engineThrottle)) {
+      car.engineThrottle = THREE.MathUtils.lerp(car.engineThrottle, throttle, 1 - Math.exp(-car.setup.engineRate * dt));
+    } else car.engineThrottle = throttle;
     const motorTorque = 1 - THREE.MathUtils.smoothstep(driveSpeed, topSpeed * 0.5, topSpeed);
     // Keep low-speed lock; ease player steering down by at most ten percent.
     const speedSteering = steeringGain > 1 ? 1 - 0.1 * THREE.MathUtils.smoothstep(Math.abs(speed), 30, 180) : 1;
@@ -291,14 +301,18 @@ export class MeshPhysics {
     for (let i = 0; i < car.vehicle.numWheels(); i++) {
       const front = car.setup.wheels[i].position.z > 0;
       const wheel = car.setup.wheels[i];
-      // Give player cars usable lock even when stock ratios are small (Cougar: 0.25).
-      const steerRatio = steeringGain > 1 ? Math.max(0.45, wheel.steerRatio ?? 0.45) : (wheel.steerRatio ?? 0.45);
+      // Preserve each car's authored lock, with the same input gain for every player car.
+      const steerRatio = wheel.steerRatio ?? 0.45;
       const steeringLimit = steeringGain > 1 ? 1.05 : 0.8;
       car.vehicle.setWheelSteering(i, (wheel.turnable ?? front) ? THREE.MathUtils.clamp(steering * steerRatio * steeringGain, -steeringLimit, steeringLimit) * speedSteering : 0);
-      car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? throttle * motorTorque * 360 * speedMultiplier * (1 - 0.65 * waterFraction) * (wheel.engineRatio??1) / Math.max(1,totalDriveRatio) : 0);
+      // EngineRatio is wheel torque, not a share of a fixed total engine force.
+      const driveForce = car.setup.bodyMass === undefined
+        ? 360 * (wheel.engineRatio ?? 1) / Math.max(1, totalDriveRatio)
+        : (wheel.engineRatio ?? 0) / wheel.radius * ENGINE_FORCE_SCALE;
+      car.vehicle.setWheelEngineForce(i, (wheel.powered ?? true) ? car.engineThrottle * motorTorque * driveForce * speedMultiplier * (1 - 0.65 * waterFraction) : 0);
       car.vehicle.setWheelBrake(i, brake * 18 + (handbrake && !front ? 30 : 0));
-      car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 : 2.5) * traction * (1 - 0.6 * waterFraction));
-      car.vehicle.setWheelSideFrictionStiffness(i, traction);
+      car.vehicle.setWheelFrictionSlip(i, (handbrake && !front ? 0.7 * (wheel.kineticFriction ?? 1.45) / 1.45 : 2.5 * (wheel.staticFriction ?? 1.5) / 1.5) * traction * (1 - 0.6 * waterFraction));
+      car.vehicle.setWheelSideFrictionStiffness(i, traction * (wheel.grip ?? 0.015) / 0.015);
     }
     car.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, TERRAIN_GROUPS, collider => collider.handle === this.terrain?.handle);
     // At full throttle the tire solver saturates lateral grip. Give both the

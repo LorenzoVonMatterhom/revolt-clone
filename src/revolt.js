@@ -3,6 +3,7 @@ import { parseDirectionTriggers } from "./track-directions.js";
 import { collisionMesh } from "./collision-mesh.js";
 import { PoolWater } from "./pool-water.js";
 import { FlexibleAntenna } from "./car-effects.js";
+import { parseCarPerformance } from "./car-performance.js";
 import { gameAssetUrl } from "./assets.js";
 import { computeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 
@@ -293,7 +294,8 @@ export function disposeLevel(level) {
 export async function loadCar(id, name) {
   const base = `/cars/${id}`;
   const response = await fetch(gameAssetUrl(`${base}/parameters.txt`));
-  const parameters = (await response.text()).replace(/;[^\r\n]*/g, "");
+  const parameters = (await response.text()).replace(/\0/g, "").replace(/;[^\r\n]*/g, "");
+  const performance = parseCarPerformance(parameters);
   const models = new Map([...parameters.matchAll(/MODEL\s+(\d+)\s+"([^"]+)"/gi)].map((m) => [Number(m[1]), `/${m[2].replaceAll("\\", "/").toLowerCase()}`]));
   const tpage = parameters.match(/TPAGE\s+"([^"]+)"/i)[1];
   const texture = decodeBitmap(await fetchBuffer(`/${tpage.replaceAll("\\", "/").toLowerCase()}`));
@@ -335,12 +337,14 @@ export async function loadCar(id, name) {
   });
   root.userData.wheels = wheels;
   root.userData.physics = {
+    ...performance,
+    centerOfMass: performance.centerOfMass ? new THREE.Vector3(...converted(performance.centerOfMass)).add(visual.position) : null,
     bodyVertices: new Float32Array(bodyVertices),
     halfExtents: bodyBounds.getSize(new THREE.Vector3()).multiplyScalar(0.5),
     center: bodyBounds.getCenter(new THREE.Vector3()).add(visual.position),
-    wheels: wheels.map((wheel) => {
+    wheels: wheels.map((wheel, index) => {
       const size = new THREE.Box3().setFromObject(wheel).getSize(new THREE.Vector3());
-      return { position: wheel.position.clone().add(visual.position), radius: size.y * 0.5, halfWidth: size.x * 0.5, turnable: wheel.userData.turnable, powered: wheel.userData.powered, steerRatio: wheel.userData.steerRatio, engineRatio: wheel.userData.engineRatio };
+      return { ...performance.wheels[index], position: wheel.position.clone().add(visual.position), radius: performance.wheels[index]?.radius ?? size.y * 0.5, halfWidth: size.x * 0.5, turnable: wheel.userData.turnable, powered: wheel.userData.powered, steerRatio: wheel.userData.steerRatio, engineRatio: wheel.userData.engineRatio };
     }),
   };
   const aerial = parameters.match(/AERIAL\s*\{([^}]+)\}/i)?.[1] ?? "";
